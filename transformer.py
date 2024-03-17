@@ -3,7 +3,6 @@ import torch.nn as nn
 import argparse
 import tiktoken
 
-
 class Transformer(nn.Module):
     def __init__(self, hidden_dim, train=False):
         self.hidden_dim = hidden_dim
