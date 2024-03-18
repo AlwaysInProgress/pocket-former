@@ -6,6 +6,7 @@ from tqdm import tqdm
 from dataset import *
 import datetime
 from dataclasses import dataclass
+import math
 
 @dataclass
 class Args:
@@ -16,6 +17,8 @@ class Args:
     num_epochs: int
     prompt: Optional[str]
     train: bool
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class AttentionHead(nn.Module):
     def __init__(self, hidden_dim, qkv_dim, dropout=0.):
@@ -49,7 +52,7 @@ class AttentionHead(nn.Module):
         return res
 
 class Transformer(nn.Module):
-    def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0., train=False, vocab_size=50257):
+    def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0., vocab_size=50257):
         super(Transformer, self).__init__()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.hidden_dim = hidden_dim
@@ -88,7 +91,7 @@ class Transformer(nn.Module):
         res = self.mlp(res) + self.layer_norm(res)
         return self.lm_head(res)
 
-def train_epoch(model, optimizer, args):
+def train_epoch(model: Transformer, optimizer, args: Args):
     train_loader = get_epoch(args.seq_len, args.bs, epoch_len=10, split='train')
     model.train()
     loss_sum = 0
@@ -101,12 +104,13 @@ def train_epoch(model, optimizer, args):
         loss = nn.functional.cross_entropy(output, labels)
         loss.backward()
         optimizer.step()
-        loss_sum += loss
+        loss_sum += loss.item()
+
     loss_avg = loss_sum / len(train_loader)
 
     return loss_avg
 
-def eval_epoch(model, args):
+def eval_epoch(model: Transformer, args: Args):
     val_loader = get_epoch(args.seq_len, args.bs, epoch_len=10, split='test')
     model.train()
     loss_sum = 0
@@ -117,7 +121,7 @@ def eval_epoch(model, args):
             labels = labels.view(-1).to(device)
             output = model(batch).view((-1, model.vocab_size))
             loss = nn.functional.cross_entropy(output, labels)
-            loss_sum += loss
+            loss_sum += loss.item()
 
     loss_avg = loss_sum / len(val_loader)
 
@@ -131,9 +135,9 @@ def train(model: Transformer, args: Args):
         train_loss = train_epoch(model, optimizer, args)
         val_loss = train_epoch(t, optimizer, args)
         print(f'train loss for epoch {epoch}: {train_loss}')
-        print(f'train perplexity: {torch.exp(train_loss)}')
+        print(f'train perplexity: {math.exp(train_loss)}')
         print(f'val loss for epoch {epoch}: {val_loss}')
-        print(f'val perplexity: {torch.exp(val_loss)}')
+        print(f'val perplexity: {math.exp(val_loss)}')
         save_model(model, "checkpoints")
 
 def save_model(model, path, name=None):
@@ -181,7 +185,7 @@ if __name__ == "__main__":
     parser.add_argument("--prompt", type=str)
     args = parser.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # Casts args to dataclass
     args = Args(
         bs=args.bs,
@@ -197,7 +201,6 @@ if __name__ == "__main__":
         seq_len=args.seq_len, 
         hidden_dim=args.hidden_dim, 
         num_heads=args.num_heads, 
-        train=False
     ).to(device)
 
 
