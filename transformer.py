@@ -4,6 +4,7 @@ import argparse
 import tiktoken
 from tqdm import tqdm
 from dataset import *
+import datetime
 
 class AttentionHead(nn.Module):
     def __init__(self, hidden_dim, qkv_dim, dropout=0.):
@@ -39,12 +40,14 @@ class AttentionHead(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0., train=False, vocab_size=50257):
         super(Transformer, self).__init__()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.hidden_dim = hidden_dim
         self.seq_len = seq_len
         self.num_heads = num_heads
         assert self.hidden_dim % self.num_heads == 0
         self.vocab_size = vocab_size
-        self.embedding = nn.Embedding(self.vocab_size, self.hidden_dim)
+        self.embedding = nn.Embedding(self.vocab_size, self.hidden_dim).to(device)
+        self.positional_encoding = nn.Parameter(torch.randn((self.seq_len, self.hidden_dim))).to(device) 
         self.attention_heads = nn.ModuleList(
             [AttentionHead(hidden_dim=self.hidden_dim, qkv_dim=self.hidden_dim // self.num_heads) for h in range(num_heads)]
         )
@@ -62,15 +65,13 @@ class Transformer(nn.Module):
 
         self.lm_head = nn.Linear(self.hidden_dim, vocab_size)
 
-    def positional_encoding(self, x):
-        pass
-
     def mha(self, x):
         # projections have shape (batch_size, num_heads, seq_len, hidden_dim)
         return self.mha_proj(torch.concatenate([head(x) for head in self.attention_heads], dim=-1))
 
     def forward(self, x):
         x = self.embedding(x)
+        x = x + self.positional_encoding
         attn = self.mha(x)
         res = self.dropout(x + self.layer_norm(attn))
         res = self.mlp(res) + self.layer_norm(res)
@@ -83,8 +84,10 @@ def train_epoch(model, optimizer, args):
 
     for batch, labels in tqdm(train_loader):
         optimizer.zero_grad()
-        output = model(batch)
-        loss = nn.functional.cross_entropy(output.view((-1, 50257)), labels.view(-1))
+        batch = batch.to(device)
+        labels = labels.view(-1).to(device)
+        output = model(batch).view((-1, model.vocab_size))
+        loss = nn.functional.cross_entropy(output, labels)
         loss.backward()
         optimizer.step()
         loss_sum += loss
@@ -99,8 +102,10 @@ def eval_epoch(model, args):
 
     with torch.no_grad():
         for batch, labels in tqdm(val_loader):
-            output = model(batch)
-            loss = nn.functional.cross_entropy(output.view((-1, 50257)), labels.view(-1))
+            batch = batch.to(device)
+            labels = labels.view(-1).to(device)
+            output = model(batch).view((-1, model.vocab_size))
+            loss = nn.functional.cross_entropy(output, labels)
             loss_sum += loss
 
     loss_avg = loss_sum / len(val_loader)
@@ -112,8 +117,21 @@ def train(model, optimizer, num_epochs):
     for epoch in range(num_epochs):
         train_loss = train_epoch(model, optimizer, args)
         print(f'train loss for epoch {epoch}: {train_loss}')
+        print(f'train perplexity: {torch.exp(train_loss)}')
         val_loss = train_epoch(model, optimizer, args)
         print(f'val loss for epoch {epoch}: {val_loss}')
+        print(f'val perplexity: {torch.exp(val_loss)}')
+        save_model(model, "checkpoints")
+
+def save_model(model, path, name=None):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    if name is None:
+        datetime_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        name = f"model_{datetime_str}"
+
+    torch.save(model.state_dict(), os.path.join(path, name))
+    print(f"Model saved to {os.path.join(path, name)}")
 
 def prompt(t: Transformer, prompt: str, seq_len: int) -> str:
     t.eval()
@@ -145,12 +163,14 @@ if __name__ == "__main__":
     parser.add_argument("--prompt", type=str, default="")
     args = parser.parse_args()
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     t = Transformer(
         seq_len=args.seq_len, 
         hidden_dim=args.hidden_dim, 
         num_heads=args.num_heads, 
         train=False
-    )
+    ).to(device)
 
     if args.train:
         optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
