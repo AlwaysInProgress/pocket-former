@@ -107,20 +107,20 @@ def eval_epoch(model, val_loader):
     return loss_avg    
 
 def train(model, train_loader, val_loader, optimizer, num_epochs):
+    model.train()
     for epoch in range(num_epochs):
         train_loss = train_epoch(model, train_loader, optimizer)
         print(f'train loss for epoch {epoch}: {train_loss}')
         val_loss = train_epoch(model, val_loader, optimizer)
         print(f'val loss for epoch {epoch}: {val_loss}')
 
-def prompt(prompt: str, bs: int, seq_len: int) -> str:
-    t = Transformer()
+def prompt(t: Transformer, prompt: str, seq_len: int) -> str:
     t.eval()
 
-    enc = tiktoken.get_encoding("cl100k_base")
+    enc = tiktoken.get_encoding("gpt2")
     encoded_p = enc.encode(prompt)
 
-    eos = torch.zeros((seq_len, bs)) # eos token
+    eos = torch.zeros((seq_len)) # eos token
     x = torch.tensor(encoded_p)
     max_tokens = 10
 
@@ -132,9 +132,7 @@ def prompt(prompt: str, bs: int, seq_len: int) -> str:
                 break
             x = torch.concatenate([x[1:], next_token], dim=0)
 
-    response = enc.decode(x)
-
-    return response
+    return "Hello World"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -146,22 +144,19 @@ if __name__ == "__main__":
     parser.add_argument("--prompt", type=str, default="How do you want to die?")
     args = parser.parse_args()
 
-    mode = "train" if args.train else "prompt"
-
-    # if args.train:
-    #     train()
-    # else:
-    #     prompt(args.prompt, args.bs, args.seq_len)
 
     t = Transformer(seq_len=args.seq_len, hidden_dim=args.hidden_dim, num_heads=args.num_heads, train=False)
-    t.eval()
-    
-    train_loader = get_fake_data(args)
-    val_loader = get_fake_data(args)
+
+    if not args.prompt is None:
+        res = prompt(t, args.prompt, args.seq_len)
+        print(res)
+        exit()
+    elif args.train:
+        train_loader = get_fake_data(args)
+        val_loader = get_fake_data(args)
+        optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
+        train(t, train_loader, val_loader, optimizer, num_epochs=10)
+    else:
+        parser.print_help()
 
 
-    optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
-    train(t, train_loader, val_loader, optimizer, num_epochs=10)
-
-    # print("output shape", output.shape)
-    # print("output", output)
