@@ -31,14 +31,12 @@ class AttentionHead(nn.Module):
         attn_map_masked = attn_map * attn_mask
         attn_map_masked[attn_mask == 0] = -torch.inf
 
-        print("attn map: ", attn_map_masked)
-
         res = attn_map_masked @ v
 
         return res
 
 class Transformer(nn.Module):
-    def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0., train=False):
+    def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0., train=False, vocab_size=50257):
         super(Transformer, self).__init__()
         self.hidden_dim = hidden_dim
         self.seq_len = seq_len
@@ -59,6 +57,9 @@ class Transformer(nn.Module):
             self.dropout
         )
 
+        self.vocab_size = vocab_size
+        self.lm_head = nn.Linear(self.hidden_dim, self.vocab_size)
+
     def mha(self, x):
         # projections have shape (batch_size, num_heads, seq_len, hidden_dim)
         return self.mha_proj(torch.concatenate([head(x) for head in self.attention_heads], dim=-1))
@@ -66,35 +67,40 @@ class Transformer(nn.Module):
     def forward(self, x):
         attn = self.mha(x)
         res = self.dropout(x + self.layer_norm(attn))
-        return self.mlp(res) + self.layer_norm(res)
+        res = self.mlp(res) + self.layer_norm(res)
+        return self.lm_head(res)
         
 def get_fake_data(args):
-    # return torch.zeros((args.bs, args.seq_len, args.hidden_dim))
-    return torch.randn((args.bs, args.seq_len, args.hidden_dim))
+    # list of tuples of (batch, labels)
+    batches = [torch.randn((args.bs, args.seq_len, args.hidden_dim)) for _ in range(100)]
+    labels = [torch.randint(0, 50257, (args.bs, args.seq_len)) for _ in range(100)]
+    return list(zip(batches, labels))
 
 def train_epoch(model, train_loader, optimizer):
     model.train()
     loss_sum = 0
 
-    for batch, labels in train_loader:
+    for batch, labels in tqdm(train_loader):
         optimizer.zero_grad()
-        loss = nn.CrossEntropyLoss(model(batch), labels)
+        output = model(batch)
+        loss = nn.functional.cross_entropy(output.view((-1, 50257)), labels.view(-1))
         loss.backward()
         optimizer.step()
-        loss += loss_sum
+        loss_sum += loss.item()
 
     loss_avg = loss_sum / len(train_loader)
 
-    return loss_avg  
+    return loss_avg
 
 def eval_epoch(model, val_loader):
     model.train()
     loss_sum = 0
 
     with torch.no_grad():
-        for batch, labels in val_loader:
-            loss = nn.CrossEntropyLoss(model(batch), labels)
-            loss += loss_sum
+        for batch, labels in tqdm(val_loader):
+            output = model(batch)
+            loss = nn.CrossEntropyLoss(output, labels)
+            loss += loss_sum.item()
 
     loss_avg = loss_sum / len(val_loader)
 
@@ -149,8 +155,13 @@ if __name__ == "__main__":
 
     t = Transformer(seq_len=args.seq_len, hidden_dim=args.hidden_dim, num_heads=args.num_heads, train=False)
     t.eval()
-    data = get_fake_data(args)
+    
+    train_loader = get_fake_data(args)
+    val_loader = get_fake_data(args)
 
-    output = t(data)
-    print("output shape", output.shape)
-    print("output", output)
+
+    optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
+    train(t, train_loader, val_loader, optimizer, num_epochs=10)
+
+    # print("output shape", output.shape)
+    # print("output", output)
