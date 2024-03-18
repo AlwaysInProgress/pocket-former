@@ -38,37 +38,35 @@ def downloadData():
     train_data = lines[:int(n * split_percent)]
     test_data = lines[int(n * split_percent):]
 
-    np.array(train_data, dtype=np.int16).tofile(train_file_path)
-    np.array(test_data, dtype=np.int16).tofile(test_file_path)
+    np.array(train_data, dtype=np.uint16).tofile(train_file_path)
+    np.array(test_data, dtype=np.uint16).tofile(test_file_path)
 
 
 def get_batch(seq_len: int, batch_size: int, split: Literal['train', 'test']):
     file_path = train_file_path if split == 'train' else test_file_path
-    data = np.fromfile(file_path, dtype=np.int16)
+    data = np.fromfile(file_path, dtype=np.uint16)
     n = len(data)
 
     idx = np.random.randint(0, n - seq_len, batch_size)
 
-    return [data[i:i+seq_len] for i in idx]
+    res = [data[i:i+seq_len] for i in idx]
 
-def get_train_loader(num_batches: int, seq_len: int, batch_size: int):
+    return torch.tensor(res, dtype=torch.int64)
+
+def get_epoch(seq_len: int, batch_size: int, epoch_len:int, split: Literal['train', 'test']):
     batches = []
-    for _ in range(num_batches):
-        batches.append((torch.tensor(get_batch(seq_len, batch_size, 'train'), dtype=torch.int64), torch.tensor(get_batch(seq_len, batch_size, 'train'), dtype=torch.int64)))
+    for _ in range(epoch_len):
+        batches.append((
+            torch.tensor(get_batch(seq_len, batch_size, split), dtype=torch.int64),
+            torch.tensor(get_batch(seq_len, batch_size, split), dtype=torch.int64)
+        ))
 
     return batches
 
-def get_val_loader(num_batches: int, seq_len: int, batch_size: int):
-    batches = []
-    for _ in range(num_batches):
-        batches.append((torch.tensor(get_batch(seq_len, batch_size, 'test'), dtype=torch.int64), torch.tensor(get_batch(seq_len, batch_size, 'test'), dtype=torch.int64)))
-
-    return batches
-
-def print_batch(samples):
-    samples = [enc.decode(x.tolist()) for x in samples]
+def print_batch(samples: torch.Tensor):
+    # Loop through the samples and convert them to text
     for sample in samples:
-        print(sample)
+        print(enc.decode(sample.tolist()))
 
 
 download_flag = sys.argv[1] == "download" if len(sys.argv) > 1 else False
