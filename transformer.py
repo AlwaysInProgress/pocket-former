@@ -75,12 +75,6 @@ class Transformer(nn.Module):
         res = self.dropout(x + self.layer_norm(attn))
         res = self.mlp(res) + self.layer_norm(res)
         return self.lm_head(res)
-        
-def get_fake_data(args):
-    # list of tuples of (batch, labels)
-    batches = [torch.randn((args.bs, args.seq_len, args.hidden_dim)) for _ in range(10)]
-    labels = [torch.randint(0, 50257, (args.bs, args.seq_len)) for _ in range(10)]
-    return list(zip(batches, labels))
 
 def train_epoch(model, optimizer, args):
     train_loader = get_epoch(args.seq_len, args.bs, epoch_len=10, split='train')

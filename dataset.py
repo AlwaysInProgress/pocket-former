@@ -15,6 +15,12 @@ os.makedirs(os.path.dirname("./data/"), exist_ok=True)
 enc = tiktoken.get_encoding("gpt2")
 end_of_sentence_token = 50256
 
+def get_fake_data(args):
+    # list of tuples of (batch, labels)
+    batches = [torch.randn((args.bs, args.seq_len, args.hidden_dim)) for _ in range(10)]
+    labels = [torch.randint(0, 50257, (args.bs, args.seq_len)) for _ in range(10)]
+    return list(zip(batches, labels))
+
 def downloadData():
     if not os.path.exists(input_file_path):
         data = requests.get(small_wikipedia_link).text
@@ -40,7 +46,6 @@ def downloadData():
 
     np.array(train_data, dtype=np.uint16).tofile(train_file_path)
     np.array(test_data, dtype=np.uint16).tofile(test_file_path)
-
 
 def get_batch(seq_len: int, batch_size: int, split: Literal['train', 'test']):
     file_path = train_file_path if split == 'train' else test_file_path
