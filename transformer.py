@@ -142,11 +142,15 @@ if __name__ == "__main__":
     parser.add_argument("--seq_len", type=int, default=16)    
     parser.add_argument("--hidden_dim", type=int, default=128)    
     parser.add_argument("--num_heads", type=int, default=2)    
-    parser.add_argument("--prompt", type=str, default="How do you want to die?")
+    parser.add_argument("--prompt", type=str, default="")
     args = parser.parse_args()
 
-
-    t = Transformer(seq_len=args.seq_len, hidden_dim=args.hidden_dim, num_heads=args.num_heads, train=False)
+    t = Transformer(
+        seq_len=args.seq_len, 
+        hidden_dim=args.hidden_dim, 
+        num_heads=args.num_heads, 
+        train=False
+    )
 
     if args.train:
         train_loader = get_train_loader(num_batches=10, seq_len=args.seq_len, batch_size=args.bs)
