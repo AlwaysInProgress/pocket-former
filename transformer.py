@@ -1,9 +1,20 @@
+from typing import Optional
 import torch
 import torch.nn as nn
 import argparse
-import tiktoken
 from tqdm import tqdm
 from dataset import *
+from dataclasses import dataclass
+
+@dataclass
+class Args:
+    bs: int
+    seq_len: int
+    hidden_dim: int
+    num_heads: int
+    num_epochs: int
+    prompt: Optional[str]
+    train: bool
 
 class AttentionHead(nn.Module):
     def __init__(self, hidden_dim, qkv_dim, dropout=0.):
@@ -107,33 +118,39 @@ def eval_epoch(model, args):
 
     return loss_avg    
 
-def train(model, optimizer, num_epochs):
-    model.train()
-    for epoch in range(num_epochs):
-        train_loss = train_epoch(model, optimizer, args)
+
+def train(t: Transformer, args: Args):
+    optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
+    t.train()
+    for epoch in range(args.num_epochs):
+        train_loss = train_epoch(t, optimizer, args)
         print(f'train loss for epoch {epoch}: {train_loss}')
-        val_loss = train_epoch(model, optimizer, args)
+        val_loss = train_epoch(t, optimizer, args)
         print(f'val loss for epoch {epoch}: {val_loss}')
 
-def prompt(t: Transformer, prompt: str, seq_len: int) -> str:
-    t.eval()
-
-    enc = tiktoken.get_encoding("gpt2")
-    encoded_p = enc.encode(prompt)
-
-    eos = torch.zeros((seq_len)) # eos token
-    x = torch.tensor(encoded_p)
-    max_tokens = 10
-
-    with torch.no_grad():
-        for token in range(max_tokens):
-            probs = t(x)[-1]
-            next_token = torch.argmax(probs, dim=-1)
-            if next_token == eos:
-                break
-            x = torch.concatenate([x[1:], next_token], dim=0)
+def prompt(t: Transformer, prompt: str) -> str:
+    # t.eval()
+    #
+    # enc = tiktoken.get_encoding("gpt2")
+    # encoded_p = enc.encode(prompt)
+    #
+    # eos = torch.zeros((seq_len)) # eos token
+    # x = torch.tensor(encoded_p)
+    # max_tokens = 10
+    #
+    # with torch.no_grad():
+    #     for token in range(max_tokens):
+    #         probs = t(x)[-1]
+    #         next_token = torch.argmax(probs, dim=-1)
+    #         if next_token == eos:
+    #             break
+    #         x = torch.concatenate([x[1:], next_token], dim=0)
 
     return "Hello World"
+
+
+# define custom args type
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -142,8 +159,20 @@ if __name__ == "__main__":
     parser.add_argument("--seq_len", type=int, default=16)    
     parser.add_argument("--hidden_dim", type=int, default=128)    
     parser.add_argument("--num_heads", type=int, default=2)    
-    parser.add_argument("--prompt", type=str, default="")
+    parser.add_argument("--num_epochs", type=int, default=10)
+    parser.add_argument("--prompt", type=str)
     args = parser.parse_args()
+
+    # Casts args to dataclass
+    args = Args(
+        bs=args.bs,
+        seq_len=args.seq_len,
+        hidden_dim=args.hidden_dim,
+        num_heads=args.num_heads,
+        num_epochs=args.num_epochs,
+        train=args.train,
+        prompt=args.prompt
+    );
 
     t = Transformer(
         seq_len=args.seq_len, 
@@ -152,12 +181,14 @@ if __name__ == "__main__":
         train=False
     )
 
+
     if args.train:
-        optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
-        train(t, optimizer, num_epochs=10)
-    elif args.prompt is not None:
-        res = prompt(t, args.prompt, args.seq_len)
-        print(res)
+        train(t, args)
+    elif not args.prompt is None:
+        print("Prompt: ", args.prompt)
+        res = prompt(t, args.prompt)
+        print("Response:", res)
         exit()
     else:
         parser.print_help()
+
