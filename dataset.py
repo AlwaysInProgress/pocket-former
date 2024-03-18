@@ -49,15 +49,21 @@ def get_batch(seq_len: int, batch_size: int, split: Literal['train', 'test']):
 
     idx = np.random.randint(0, n - seq_len, batch_size)
 
-    return torch.tensor([data[i:i+seq_len] for i in idx])
+    return [data[i:i+seq_len] for i in idx]
 
 def get_train_loader(num_batches: int, seq_len: int, batch_size: int):
+    batches = []
     for _ in range(num_batches):
-        return (torch.tensor(get_batch(seq_len, batch_size, 'train')), torch.tensor(get_batch(seq_len, batch_size, 'train')))
+        batches.append((torch.tensor(get_batch(seq_len, batch_size, 'train'), dtype=torch.int64), torch.tensor(get_batch(seq_len, batch_size, 'train'), dtype=torch.int64)))
+
+    return batches
 
 def get_val_loader(num_batches: int, seq_len: int, batch_size: int):
+    batches = []
     for _ in range(num_batches):
-        return (torch.tensor(get_batch(seq_len, batch_size, 'test')), torch.tensor(get_batch(seq_len, batch_size, 'test')))
+        batches.append((torch.tensor(get_batch(seq_len, batch_size, 'test'), dtype=torch.int64), torch.tensor(get_batch(seq_len, batch_size, 'test'), dtype=torch.int64)))
+
+    return batches
 
 def print_batch(samples):
     samples = [enc.decode(x.tolist()) for x in samples]

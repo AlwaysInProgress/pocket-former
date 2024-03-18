@@ -43,6 +43,7 @@ class Transformer(nn.Module):
         self.seq_len = seq_len
         self.num_heads = num_heads
         assert self.hidden_dim % self.num_heads == 0
+        self.embedding = nn.Embedding(vocab_size, hidden_dim)
         self.attention_heads = nn.ModuleList(
             [AttentionHead(hidden_dim=self.hidden_dim, qkv_dim=self.hidden_dim // self.num_heads) for h in range(num_heads)]
         )
@@ -66,6 +67,9 @@ class Transformer(nn.Module):
         return self.mha_proj(torch.concatenate([head(x) for head in self.attention_heads], dim=-1))
 
     def forward(self, x):
+        print(x)
+        x = torch.nn.functional.one_hot(x.long(), num_classes=self.vocab_size)
+        x = self.embedding(x)
         attn = self.mha(x)
         res = self.dropout(x + self.layer_norm(attn))
         res = self.mlp(res) + self.layer_norm(res)
@@ -156,6 +160,8 @@ if __name__ == "__main__":
         train_loader = get_train_loader(num_batches=10, seq_len=args.seq_len, batch_size=args.bs)
         val_loader = get_val_loader(num_batches=10, seq_len=args.seq_len, batch_size=args.bs)
         optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
+        print("batch example:", train_loader[0][0].shape)
+        
         train(t, train_loader, val_loader, optimizer, num_epochs=10)
     elif args.prompt is not None:
         res = prompt(t, args.prompt, args.seq_len)
