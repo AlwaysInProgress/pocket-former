@@ -137,7 +137,7 @@ def prompt(t: Transformer, prompt: str, seq_len: int) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train", type=bool, default=True)
+    parser.add_argument("--train", action="store_true")
     parser.add_argument("--bs", type=int, default=16)
     parser.add_argument("--seq_len", type=int, default=16)    
     parser.add_argument("--hidden_dim", type=int, default=128)    
@@ -148,14 +148,14 @@ if __name__ == "__main__":
 
     t = Transformer(seq_len=args.seq_len, hidden_dim=args.hidden_dim, num_heads=args.num_heads, train=False)
 
-    if not args.prompt is None:
-        res = prompt(t, args.prompt, args.seq_len)
-        print(res)
-        exit()
-    elif args.train:
+    if args.train:
         train_loader = get_train_loader(num_batches=10, seq_len=args.seq_len, batch_size=args.bs)
         val_loader = get_val_loader(num_batches=10, seq_len=args.seq_len, batch_size=args.bs)
         optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
         train(t, train_loader, val_loader, optimizer, num_epochs=10)
+    elif args.prompt is not None:
+        res = prompt(t, args.prompt, args.seq_len)
+        print(res)
+        exit()
     else:
         parser.print_help()
