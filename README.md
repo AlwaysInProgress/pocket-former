@@ -17,3 +17,14 @@ python dataset.py sample
 ```
 
 
+Train the model
+```bash
+python transformer.py --train
+```
+
+Inference the model
+```bash
+python transformer.py --prompt "Hello World"
+```
+
+
