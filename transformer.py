@@ -3,6 +3,7 @@ import torch.nn as nn
 import argparse
 import tiktoken
 from tqdm import tqdm
+from dataset import *
 
 class AttentionHead(nn.Module):
     def __init__(self, hidden_dim, qkv_dim, dropout=0.):
@@ -29,7 +30,7 @@ class AttentionHead(nn.Module):
         attn_map = self.dropout(attn_map)
         attn_mask = torch.tril(torch.ones_like(attn_map))
         attn_map_masked = attn_map * attn_mask
-        attn_map_masked[attn_mask == 0] = -torch.inf
+        attn_map_masked[attn_mask == 0] = 1e-9
 
         res = attn_map_masked @ v
 
@@ -72,8 +73,8 @@ class Transformer(nn.Module):
         
 def get_fake_data(args):
     # list of tuples of (batch, labels)
-    batches = [torch.randn((args.bs, args.seq_len, args.hidden_dim)) for _ in range(100)]
-    labels = [torch.randint(0, 50257, (args.bs, args.seq_len)) for _ in range(100)]
+    batches = [torch.randn((args.bs, args.seq_len, args.hidden_dim)) for _ in range(10)]
+    labels = [torch.randint(0, 50257, (args.bs, args.seq_len)) for _ in range(10)]
     return list(zip(batches, labels))
 
 def train_epoch(model, train_loader, optimizer):
@@ -84,10 +85,10 @@ def train_epoch(model, train_loader, optimizer):
         optimizer.zero_grad()
         output = model(batch)
         loss = nn.functional.cross_entropy(output.view((-1, 50257)), labels.view(-1))
+        print(f'loss: {loss}')
         loss.backward()
         optimizer.step()
-        loss_sum += loss.item()
-
+        loss_sum += loss
     loss_avg = loss_sum / len(train_loader)
 
     return loss_avg
@@ -99,8 +100,8 @@ def eval_epoch(model, val_loader):
     with torch.no_grad():
         for batch, labels in tqdm(val_loader):
             output = model(batch)
-            loss = nn.CrossEntropyLoss(output, labels)
-            loss += loss_sum.item()
+            loss = nn.functional.cross_entropy(output.view((-1, 50257)), labels.view(-1))
+            loss_sum += loss
 
     loss_avg = loss_sum / len(val_loader)
 
@@ -155,13 +156,15 @@ if __name__ == "__main__":
 
     t = Transformer(seq_len=args.seq_len, hidden_dim=args.hidden_dim, num_heads=args.num_heads, train=False)
     t.eval()
-    
-    train_loader = get_fake_data(args)
-    val_loader = get_fake_data(args)
 
-
-    optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
-    train(t, train_loader, val_loader, optimizer, num_epochs=10)
-
+    # fake_batch = torch.randn((args.bs, args.seq_len, args.hidden_dim))
+    # output = t(fake_batch)
     # print("output shape", output.shape)
     # print("output", output)
+    
+    # train_loader = get_fake_data(args)
+    # val_loader = get_fake_data(args)
+    train_loader = get_train_loader(num_batches=10, seq_len=args.seq_len, batch_size=args.bs)
+    val_loader = get_val_loader(num_batches=10, seq_len=args.seq_len, batch_size=args.bs)
+    optimizer = torch.optim.AdamW(t.parameters(), lr=1e-3, weight_decay=1e-1)
+    train(t, train_loader, val_loader, optimizer, num_epochs=10)
