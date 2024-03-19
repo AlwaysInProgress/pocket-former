@@ -71,25 +71,25 @@ class Solve:
 
         yt = YouTube(self.url)
 
-        vid_canidates = yt.streams.filter(
+        vid_candidates = yt.streams.filter(
             progressive=True,
             file_extension='mp4'
         ).order_by('resolution').desc().first()
 
-        print('Canidates found')
+        print('Candidates found')
 
-        if vid_canidates is None:
+        if vid_candidates is None:
             print("No video found 💀")
             return
         
-        vid_canidates.download(
+        vid_candidates.download(
             output_path=self.get_dir_path(),
             filename='video.mp4',
         )
 
         print('Video downloaded')
 
-    def proccess_frames(self):
+    def process_frames(self):
         '''
         Saves the frames to the data folder
         '''
@@ -107,7 +107,9 @@ class Solve:
             ret, frame = vid.read()
             if not ret:
                 break
-            frame_path = frames_path + str(frame_num) + '.png'
+            frame_path = frames_path + str(frame_num) + '.jpg'
+            # resizing image to have height of 256, keeping aspect ratio
+            frame = cv2.resize(frame, (int(frame.shape[1] * 256 / frame.shape[0]), 256))
             cv2.imwrite(frame_path, frame)
             frame_num += 1
 
@@ -168,13 +170,13 @@ def download_one_by_id(id: int):
 
     moves = []
     for grp in moveGroups:
-        canidates = grp.split(" ")
+        candidates = grp.split(" ")
 
-        # remove all canidates after "//"
-        commentStart = canidates.index("//")
+        # remove all candidates after "//"
+        commentStart = candidates.index("//")
 
-        goodCanidates = canidates[:commentStart]
-        moves += goodCanidates
+        goodCandidates = candidates[:commentStart]
+        moves += goodCandidates
 
     # Remove parenthesis
     moves = list(map(lambda m: m.replace("(", "").replace(")", ""), moves))
@@ -259,7 +261,7 @@ if __name__ == "__main__":
         if action == "download":
             solve.download_video()
         elif action == "process":
-            solve.proccess_frames()
+            solve.process_frames()
         elif action == "print":
             solve.print()
         else:
