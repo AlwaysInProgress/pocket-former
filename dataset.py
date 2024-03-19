@@ -75,7 +75,6 @@ def print_batch(samples: torch.Tensor):
     for sample in samples:
         print(enc.decode(sample.tolist()))
 
-
 download_flag = sys.argv[1] == "download" if len(sys.argv) > 1 else False
 sample_flag = sys.argv[1] == "sample" if len(sys.argv) > 1 else False
 

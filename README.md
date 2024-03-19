@@ -46,4 +46,7 @@ Download a video for the 0th solve:
 python solves.py solves 0 download
 ```
 
-
+Train the model:
+```bash
+python transformer.py --bs 32 --seq_len 16 --hidden_dim 512 --num_heads 8  --train
+```
