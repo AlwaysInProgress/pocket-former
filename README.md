@@ -39,32 +39,32 @@ Train model with customer hyperparameters:
 python transformer.py --bs 32 --seq_len 16 --hidden_dim 512 --num_heads 8  --train
 ```
 
-## Solves Dataset
+## Move Group Dataset
 
-Solves are saved to `data/solves/`
-Each solve has a data.json
+Move groups are saved to `data/mg/`
+Each move group has a data.json
 
-Download and preprocess the first 20 solves:
+Download and preprocess the first 20 move groups:
 ```bash
-python solves.py download 20
+python mg.py download 20
 ```
 
-View info for solve with id 0:
+View info for mg with id 0:
 ```bash
-python solves.py solve 0 print
+python mg.py mg 0 print
 ```
 
-Download a video for solve with id 0:
+Download a video for mg with id 0:
 ```bash
-python solves.py solve 0 download
+python mg.py mg 0 download
 ```
 
-Process all the frames for solve with id 0:
+Process all the frames for mg with id 0:
 ```bash
-python solves.py solve 0 process
+python mg.py mg 0 process
 ```
 
 Launch the labeler
 ```bash
-python solves-labeler.py
+python mg-labeler.py
 ```
