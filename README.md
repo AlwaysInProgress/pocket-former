@@ -34,32 +34,37 @@ Inference the model:
 python transformer.py --prompt "Hello World"
 ```
 
-## Solves Dataset
-
-Download and preprocess the solves data:
-```bash
-python solves.py download
-```
-
-Print the solves data:
-```bash
-python solves.py print
-```
-
-Download a video for the 0th solve:
-```bash
-python solves.py solves 0 download
-```
-
-Train the model:
+Train model with customer hyperparameters:
 ```bash
 python transformer.py --bs 32 --seq_len 16 --hidden_dim 512 --num_heads 8  --train
 ```
 
-## Labeler
+## Solves Dataset
 
+Solves are saved to `data/solves/`
+Each solve has a data.json
+
+Download and preprocess the first 20 solves:
+```bash
+python solves.py download 20
+```
+
+View info for solve with id 0:
+```bash
+python solves.py solves 0 print
+```
+
+Download a video for solve with id 0:
+```bash
+python solves.py solves 0 download
+```
+
+Process all the frames for solve with id 0:
+```bash
+python solves.py solves 0 process
+```
+
+Launch the labeler
 ```bash
 python solves-labeler.py
 ```
-
-

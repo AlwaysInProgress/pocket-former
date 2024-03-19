@@ -11,6 +11,8 @@ class VideoPlayer:
         self.cap = None
         self.frame_number = 0
         self.playingState = "paused"
+        self.solvedb = solves.Solves()
+        self.video_index = 0
 
         tk.Button(
             window,
@@ -42,6 +44,18 @@ class VideoPlayer:
             command=self.pause
         ).pack()
 
+        tk.Button(
+            window,
+            text="Next Video", 
+            command=self.next_video
+        ).pack()
+
+        tk.Button(
+            window,
+            text="Prev Video", 
+            command=self.prev_video
+        ).pack()
+
         self.label_button = tk.Button(
             window,
             text="Label is Moving", 
@@ -56,10 +70,6 @@ class VideoPlayer:
         )
         self.remove_label_button.pack()
 
-        # Frame count text view
-        self.frame_count_box = tk.Entry(window)
-        self.frame_count_box.pack()
-
         self.is_moving_label = tk.Label(window, text="Is Moving: ")
         self.is_moving_label.pack()
 
@@ -69,33 +79,34 @@ class VideoPlayer:
         self.canvas = tk.Canvas(window, width=640, height=480)
         self.canvas.pack()
 
-        self.solve_data = solves.get_from_fs()
-        solve = self.solve_data[0]
-        if solve is None:
-            print("No solve found")
-            return
-        self.solve: solves.Solve = solve
-        self.cap = self.solve.get_video()
-        self.max_frame: int = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
         self.slider = tk.Scale(
             window, 
             from_=0, 
-            to=self.max_frame,
+            to=0,
             orient=tk.HORIZONTAL,
             length=500,
             command=lambda _: self.on_slider_change()
         )
         self.slider.pack()
 
-        self.draw()
 
         self.window.bind("<Left>", self.backwards)
         self.window.bind("<Right>", self.forward)
 
-
-
+        self.load_video()
         self.loop()
+
+    def load_video(self):
+        idx = self.video_index
+        solve = self.solvedb.get_solve_by_index(idx)
+        if solve is None:
+            print("No solve found")
+            return
+        self.solve = solve
+        self.cap = self.solve.get_video()
+        self.max_frame: int = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.draw()
+
 
     def loop(self):
         # print("Looping", self.playingState)
@@ -109,9 +120,6 @@ class VideoPlayer:
 
     def draw(self):
         print("Draw")
-        # Draw the frame number
-        self.frame_count_box.delete(0, tk.END)
-        self.frame_count_box.insert(0, str(self.frame_number))
 
         is_moving = self.solve.is_cube_moving(self.frame_number)
         self.is_moving_label.config(text="Is Moving: " + str(is_moving))
@@ -119,6 +127,7 @@ class VideoPlayer:
         labeled_frames = ','.join([str(frame) for frame in self.solve.action_frames])
         self.labeled_frames_label.config(text="Label Frames: " + labeled_frames)
 
+        self.slider.config(to=self.max_frame)
         self.slider.set(self.frame_number)
 
 
@@ -148,16 +157,28 @@ class VideoPlayer:
         self.canvas.image = photo
         self.canvas.pack()
 
+    def next_video(self):
+        self.video_index += 1
+        if self.video_index >= self.solvedb.get_solves_count():
+            self.video_index = 0
+        self.load_video()
+
+    def prev_video(self):
+        self.video_index -= 1
+        if self.video_index < 0:
+            self.video_index = self.solvedb.get_solves_count() - 1
+        self.load_video()
+
     def label(self):
         print("Label")
         self.solve.new_action(self.frame_number)
-        solves.save_to_fs(self.solve_data)
+        self.solve.save_to_fs()
         self.draw()
 
     def remove_label(self):
         print("Remove Label")
         self.solve.remove_last_action()
-        solves.save_to_fs(self.solve_data)
+        self.solve.save_to_fs()
         self.draw()
 
     def on_slider_change(self):
