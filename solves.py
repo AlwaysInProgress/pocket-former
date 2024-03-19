@@ -213,6 +213,9 @@ class Solves:
 
         return merged_solves
 
+    def get_solves_count(self):
+        return len(os.listdir('data/solves'))
+
     def get_solve_by_index(self, idx: int):
         solves = os.listdir('data/solves')
 
