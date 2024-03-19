@@ -105,8 +105,8 @@ class Transformer(nn.Module):
             x = res
         return self.lm_head(res)
 
-def train_epoch(model, optimizer, args):
-    train_loader = get_epoch(args.seq_len, args.bs, epoch_len=1000, split='train')
+def train_epoch(model, optimizer, args, train_dataset):
+    train_loader = get_epoch(args.seq_len, args.bs, epoch_len=1000, data=train_dataset)
     model.train()
     loss_sum = 0
 
@@ -125,8 +125,8 @@ def train_epoch(model, optimizer, args):
 
     return loss_avg
 
-def eval_epoch(model: Transformer, args: Args):
-    val_loader = get_epoch(args.seq_len, args.bs, epoch_len=10, split='test')
+def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray) -> float:
+    val_loader = get_epoch(args.seq_len, args.bs, epoch_len=10, data=test_dataset)
     model.train()
     loss_sum = 0
 
@@ -143,12 +143,12 @@ def eval_epoch(model: Transformer, args: Args):
     return loss_avg    
 
 
-def train(model: Transformer, args: Args):
+def train(model: Transformer, args: Args, train_dataset: np.ndarray, test_dataset: np.ndarray):
     optimizer = torch.optim.AdamW(t.parameters(), lr=1e-4, weight_decay=0) # 1e-1)
     t.train()
     for epoch in range(args.num_epochs):
-        train_loss = train_epoch(model, optimizer, args)
-        val_loss = train_epoch(t, optimizer, args)
+        train_loss = train_epoch(model, optimizer, args, train_dataset)
+        val_loss = train_epoch(t, optimizer, args, test_dataset)
         print(f'train loss for epoch {epoch}: {train_loss}')
         print(f'train perplexity: {math.exp(train_loss)}')
         print(f'val loss for epoch {epoch}: {val_loss}')
@@ -239,8 +239,11 @@ if __name__ == "__main__":
     )
     t.to(device)
 
+    train_dataset = get_data('train')
+    test_dataset = get_data('test')
+
     if args.train:
-        train(t, args)
+        train(t, args, train_dataset, test_dataset)
     elif not args.prompt is None:
         res = prompt(t, args)
         print("Response:", res)
