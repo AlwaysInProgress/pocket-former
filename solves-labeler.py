@@ -69,12 +69,11 @@ class VideoPlayer:
         self.canvas = tk.Canvas(window, width=640, height=480)
         self.canvas.pack()
 
-        self.solve_data = solves.get_from_fs()
-        solve = self.solve_data[0]
+        solve = solves.Solve.get_from_fs(22)
         if solve is None:
             print("No solve found")
             return
-        self.solve: solves.Solve = solve
+        self.solve = solve
         self.cap = self.solve.get_video()
         self.max_frame: int = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
