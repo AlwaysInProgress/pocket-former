@@ -63,17 +63,37 @@ class VideoPlayer:
         self.is_moving_label = tk.Label(window, text="Is Moving: ")
         self.is_moving_label.pack()
 
+        self.labeled_frames_label = tk.Label(window, text="Label Frames: ")
+        self.labeled_frames_label.pack()
+
         self.canvas = tk.Canvas(window, width=640, height=480)
         self.canvas.pack()
 
         self.solve_data = solves.get_from_fs()
-        self.solve = self.solve_data[0]
+        solve = self.solve_data[0]
+        if solve is None:
+            print("No solve found")
+            return
+        self.solve: solves.Solve = solve
         self.cap = self.solve.get_video()
+        self.max_frame: int = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        self.slider = tk.Scale(
+            window, 
+            from_=0, 
+            to=self.max_frame,
+            orient=tk.HORIZONTAL,
+            length=500,
+            command=lambda _: self.on_slider_change()
+        )
+        self.slider.pack()
 
         self.draw()
 
         self.window.bind("<Left>", self.backwards)
         self.window.bind("<Right>", self.forward)
+
+
 
         self.loop()
 
@@ -95,6 +115,12 @@ class VideoPlayer:
 
         is_moving = self.solve.is_cube_moving(self.frame_number)
         self.is_moving_label.config(text="Is Moving: " + str(is_moving))
+
+        labeled_frames = ','.join([str(frame) for frame in self.solve.action_frames])
+        self.labeled_frames_label.config(text="Label Frames: " + labeled_frames)
+
+        self.slider.set(self.frame_number)
+
 
         if is_moving:
             self.label_button.config(text="Add label: not moving")
@@ -134,6 +160,10 @@ class VideoPlayer:
         solves.save_to_fs(self.solve_data)
         self.draw()
 
+    def on_slider_change(self):
+        self.frame_number = int(self.slider.get())
+        self.draw()
+
     def fast_forwards(self):
         self.playingState = "fast_forwards"
 
@@ -144,10 +174,14 @@ class VideoPlayer:
         self.playingState = "paused"
 
     def backwards(self, amount = 1):
+        if self.frame_number - amount < 0:
+            self.frame_number = 0
         self.frame_number -= amount
         self.draw()
 
     def forward(self, amount = 1):
+        if self.frame_number + amount > self.max_frame:
+            self.frame_number = self.max_frame
         self.frame_number += amount
         self.draw()
 

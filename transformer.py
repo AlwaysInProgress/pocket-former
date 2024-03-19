@@ -109,7 +109,12 @@ class Transformer(nn.Module):
         return self.lm_head(res)
 
 def train_epoch(model, optimizer, args, train_dataset):
-    train_loader = get_epoch(args.seq_len, args.bs, epoch_len=10000, data=train_dataset)
+    train_loader = get_epoch(
+        args.seq_len, 
+        args.bs, 
+        epoch_len=10000, 
+        dataset=train_dataset
+    )
     model.train()
     loss_sum = 0
 
@@ -129,7 +134,12 @@ def train_epoch(model, optimizer, args, train_dataset):
     return loss_avg
 
 def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray) -> float:
-    val_loader = get_epoch(args.seq_len, args.bs, epoch_len=10, data=test_dataset)
+    val_loader = get_epoch(
+        args.seq_len, 
+        args.bs, 
+        epoch_len=10, 
+        dataset=test_dataset
+    )
     model.train()
     loss_sum = 0
 
@@ -184,6 +194,14 @@ def prompt(t: Transformer, args: Args, checkpoint: str = None, dataset: np.ndarr
     encoded_p = get_batch(seq_len=args.seq_len, batch_size=1, data=dataset)
     # encoded_p = enc.encode(args.prompt)
     print("Prompt: ", enc.decode(encoded_p.squeeze().tolist()))
+    
+    if args.prompt is None:
+        print("Prompt is None")
+        return "Error: prompt is None"
+
+    encoded_p = enc.encode(args.prompt)
+    # encoded_p = get_batch(args.seq_len, 1, 'test').squeeze().tolist()
+    print("prompt decoded: ", enc.decode(encoded_p))
     # eos = torch.zeros((seq_len)) # eos token
     x = torch.tensor(encoded_p).to(device)
     max_gen_tokens = 5

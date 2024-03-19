@@ -80,25 +80,22 @@ def get_data(split: Literal['train', 'test']):
 def get_batch(
     seq_len: int, 
     batch_size: int, 
-    data: np.ndarray,
+    dataset: np.ndarray,
 ):
-    n = len(data)
-
+    n = len(dataset)
     idx = np.random.randint(0, n - seq_len, batch_size)
-
-    res = [data[i:i+seq_len] for i in idx]
-
+    res = [dataset[i:i+seq_len] for i in idx]
     return torch.tensor(res, dtype=torch.int64)
 
 def get_epoch(
     seq_len: int, 
     batch_size: int, 
     epoch_len:int, 
-    data: np.ndarray,
+    dataset: np.ndarray,
 ):
     batches = []
     for _ in range(epoch_len):
-        batch = get_batch(seq_len, batch_size, data)
+        batch = get_batch(seq_len, batch_size, dataset)
         batches.append((
             torch.tensor(batch[:-1], dtype=torch.int64), # input
             torch.tensor(batch[1:], dtype=torch.int64), # output
