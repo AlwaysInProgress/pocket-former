@@ -1,9 +1,6 @@
 import tkinter as tk
-from tkinter import filedialog
 import cv2
 import solves
-import random
-
 
 class VideoPlayer:
     def __init__(self, window):
@@ -12,7 +9,8 @@ class VideoPlayer:
 
         self.video_path = ""
         self.cap = None
-        self.current_frame = None
+        self.frame_number = 0
+        self.playingState = "paused"
 
         tk.Button(
             window,
@@ -26,6 +24,27 @@ class VideoPlayer:
             command=self.previous_frame
         ).pack()
 
+        tk.Button(
+            window,
+            text="Fast Forwards", 
+            command=self.fast_forwards
+        ).pack()
+
+        tk.Button(
+                window,
+                text="Fast Backwards", 
+                command=self.fast_backwards
+                        ).pack()
+        tk.Button(
+                window,
+                text="Pasue", 
+                command=self.pause
+                ).pack()
+
+        # Frame count text view
+        self.frame_count_box = tk.Entry(window)
+        self.frame_count_box.pack()
+
         self.canvas = tk.Canvas(window, width=640, height=480)
         self.canvas.pack()
 
@@ -34,35 +53,66 @@ class VideoPlayer:
         video = solve.get_video()
 
         self.cap = video
-        self.update_frame()
+        self.draw()
 
         self.window.bind("<Left>", self.previous_frame)
         self.window.bind("<Right>", self.next_frame)
 
-    def update_frame(self):
-        if self.cap and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            print("Drawing frame")
-            if ret:
-                self.current_frame = frame
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame, (640, 480))
-                photo = tk.PhotoImage(data=cv2.imencode('.png', frame)[1].tobytes())
-                self.canvas.create_image(0, 0, anchor=tk.NW, image=photo)
-                self.window.mainloop()
+        self.loop()
+
+    def loop(self):
+        # print("Looping", self.playingState)
+        if self.playingState == "fast_forwards":
+            self.next_frame()
+
+        elif self.playingState == "fast_backwards":
+            self.previous_frame()
+
+        self.window.after(10, self.loop)
+
+    def draw(self):
+        print("Draw")
+        # Draw the frame number
+        self.frame_count_box.delete(0, tk.END)
+        self.frame_count_box.insert(0, str(self.frame_number))
+
+        if not self.cap or not self.cap.isOpened():
+            print("No video loaded")
+            return
+
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.frame_number - 1)
+
+        ret, frame = self.cap.read()
+
+        if not ret:
+            print("No frame found")
+            return
+
+        frame = frame[:,:,::-1]
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = cv2.resize(frame, (640, 480))
+        photo = tk.PhotoImage(data=cv2.imencode('.png', frame)[1].tobytes())
+        print("Drawing frame", self.frame_number)
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+        self.canvas.image = photo
+        self.canvas.pack()
+
+    def fast_forwards(self):
+        self.playingState = "fast_forwards"
+
+    def fast_backwards(self):
+        self.playingState = "fast_backwards"
+
+    def pause(self):
+        self.playingState = "paused"
 
     def previous_frame(self):
-        print("previous_frame")
-        if self.cap and self.cap.isOpened():
-            current_frame_number = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
-            if current_frame_number > 0:
-                self.cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame_number - 2)
-                self.update_frame()
+        self.frame_number -= 1
+        self.draw()
 
     def next_frame(self):
-        print("next_frame")
-        if self.cap and self.cap.isOpened():
-            self.update_frame()
+        self.frame_number += 1
+        self.draw()
 
 if __name__ == "__main__":
     root = tk.Tk()

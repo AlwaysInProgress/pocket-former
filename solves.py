@@ -52,7 +52,8 @@ class Solve:
 
         print('Loading video', path)
 
-        return cv2.VideoCapture(path)
+        cap = cv2.VideoCapture(path)
+        return cap
 
 
 def download_one_by_id(id: int):
