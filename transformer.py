@@ -106,7 +106,12 @@ class Transformer(nn.Module):
         return self.lm_head(res)
 
 def train_epoch(model, optimizer, args, train_dataset):
-    train_loader = get_epoch(args.seq_len, args.bs, epoch_len=1000, data=train_dataset)
+    train_loader = get_epoch(
+        args.seq_len, 
+        args.bs, 
+        epoch_len=1000, 
+        dataset=train_dataset
+    )
     model.train()
     loss_sum = 0
 
@@ -126,7 +131,12 @@ def train_epoch(model, optimizer, args, train_dataset):
     return loss_avg
 
 def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray) -> float:
-    val_loader = get_epoch(args.seq_len, args.bs, epoch_len=10, data=test_dataset)
+    val_loader = get_epoch(
+        args.seq_len, 
+        args.bs, 
+        epoch_len=10, 
+        dataset=test_dataset
+    )
     model.train()
     loss_sum = 0
 
@@ -172,7 +182,7 @@ def pad_sequence(seq: torch.Tensor, seq_len: int, device: torch.device, pad_inde
     else:
         return seq
 
-def prompt(t: Transformer, args: Args, checkpoint: str = None) -> str:
+def prompt(t: Transformer, args: Args) -> str:
     t.eval()
     if args.checkpoint is not None:
         t.load_state_dict(torch.load(args.checkpoint))
@@ -180,6 +190,11 @@ def prompt(t: Transformer, args: Args, checkpoint: str = None) -> str:
     print("Prompt: ", args.prompt)
 
     enc = tiktoken.get_encoding("gpt2")
+    
+    if args.prompt is None:
+        print("Prompt is None")
+        return "Error: prompt is None"
+
     encoded_p = enc.encode(args.prompt)
     # encoded_p = get_batch(args.seq_len, 1, 'test').squeeze().tolist()
     print("prompt decoded: ", enc.decode(encoded_p))
