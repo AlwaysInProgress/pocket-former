@@ -8,6 +8,8 @@ from dataset import *
 import datetime
 from dataclasses import dataclass
 import math
+from torch import Tensor
+import torch.nn.functional as F
 
 @dataclass
 class Args:
@@ -19,6 +21,7 @@ class Args:
     prompt: Optional[str]
     train: bool
     checkpoint: Optional[str]
+    num_blocks: int
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -106,7 +109,7 @@ class Transformer(nn.Module):
         return self.lm_head(res)
 
 def train_epoch(model, optimizer, args, train_dataset):
-    train_loader = get_epoch(args.seq_len, args.bs, epoch_len=1000, data=train_dataset)
+    train_loader = get_epoch(args.seq_len, args.bs, epoch_len=10000, data=train_dataset)
     model.train()
     loss_sum = 0
 
@@ -172,29 +175,29 @@ def pad_sequence(seq: torch.Tensor, seq_len: int, device: torch.device, pad_inde
     else:
         return seq
 
-def prompt(t: Transformer, args: Args, checkpoint: str = None) -> str:
+def prompt(t: Transformer, args: Args, checkpoint: str = None, dataset: np.ndarray = None):
     t.eval()
     if args.checkpoint is not None:
         t.load_state_dict(torch.load(args.checkpoint))
 
-    print("Prompt: ", args.prompt)
-
     enc = tiktoken.get_encoding("gpt2")
-    encoded_p = enc.encode(args.prompt)
-    # encoded_p = get_batch(args.seq_len, 1, 'test').squeeze().tolist()
-    print("prompt decoded: ", enc.decode(encoded_p))
+    encoded_p = get_batch(seq_len=args.seq_len, batch_size=1, data=dataset)
+    # encoded_p = enc.encode(args.prompt)
+    print("Prompt: ", enc.decode(encoded_p.squeeze().tolist()))
     # eos = torch.zeros((seq_len)) # eos token
-    x = torch.tensor(encoded_p).unsqueeze(0).to(device)
-    max_gen_tokens = 6
+    x = torch.tensor(encoded_p).to(device)
+    max_gen_tokens = 5
     
     with torch.no_grad():
         for token in range(max_gen_tokens):
             padded_x = pad_sequence(x, args.seq_len, device).long()
             logits = t(padded_x).transpose(0, 1)[-1]
+            logits = top_k_top_p_filtering(logits, top_k=40)
             probs = torch.softmax(logits, dim=-1)
             # next_token = torch.argmax(probs, dim=-1)
             # sample from the distribution
             next_token = torch.multinomial(probs, 1)[0]
+            # next_token = nucleus_sampling(probs, p=0.9)
             if next_token == 50256:
                 break
 
@@ -202,8 +205,49 @@ def prompt(t: Transformer, args: Args, checkpoint: str = None) -> str:
                 x = x[:, 1:]
 
             x = torch.concatenate([x, next_token.unsqueeze(0)], dim=1)
+            print(enc.decode(x.squeeze().tolist()))
 
     return enc.decode(x.squeeze().tolist())
+
+def top_k_top_p_filtering(
+    logits: Tensor,
+    top_k: int = 0,
+    top_p: float = 1.0,
+    filter_value: float = -float("Inf"),
+    min_tokens_to_keep: int = 1,
+) -> Tensor:
+    """Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
+    Args:
+        logits: logits distribution shape (batch size, vocabulary size)
+        if top_k > 0: keep only top k tokens with highest probability (top-k filtering).
+        if top_p < 1.0: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
+            Nucleus filtering is described in Holtzman et al. (http://arxiv.org/abs/1904.09751)
+        Make sure we keep at least min_tokens_to_keep per batch example in the output
+    From: https://gist.github.com/thomwolf/1a5a29f6962089e871b94cbd09daf317
+    """
+    if top_k > 0:
+        top_k = min(max(top_k, min_tokens_to_keep), logits.size(-1))  # Safety check
+        # Remove all tokens with a probability less than the last token of the top-k
+        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
+        logits[indices_to_remove] = filter_value
+
+    if top_p < 1.0:
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
+        sorted_indices_to_remove = cumulative_probs > top_p
+        if min_tokens_to_keep > 1:
+            # Keep at least min_tokens_to_keep (set to min_tokens_to_keep-1 because we add the first one below)
+            sorted_indices_to_remove[..., :min_tokens_to_keep] = 0
+        # Shift the indices to the right to keep also the first token above the threshold
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+
+        # scatter sorted tensors to original indexing
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        logits[indices_to_remove] = filter_value
+    return logits
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -215,6 +259,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs", type=int, default=10)
     parser.add_argument("--prompt", type=str)
     parser.add_argument("--checkpoint", type=str)
+    parser.add_argument("--num_blocks", type=int, default=6)
     args = parser.parse_args()
 
 
@@ -227,14 +272,15 @@ if __name__ == "__main__":
         num_epochs=args.num_epochs,
         train=args.train,
         prompt=args.prompt,
-        checkpoint=args.checkpoint
+        checkpoint=args.checkpoint,
+        num_blocks=args.num_blocks
     )
 
     t = Transformer(
         seq_len=args.seq_len, 
         hidden_dim=args.hidden_dim, 
         num_heads=args.num_heads,
-        num_blocks=6,
+        num_blocks=args.num_blocks,
         train=False
     )
     t.to(device)
@@ -244,8 +290,8 @@ if __name__ == "__main__":
 
     if args.train:
         train(t, args, train_dataset, test_dataset)
-    elif not args.prompt is None:
-        res = prompt(t, args)
+    elif args.prompt is not None:
+        res = prompt(t=t, args=args, dataset=test_dataset)
         print("Response:", res)
         exit()
     else:
