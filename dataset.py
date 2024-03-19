@@ -73,9 +73,15 @@ def download_data():
         with open(input_file_path, 'w') as f:
             f.write(data)
 
-def get_batch(seq_len: int, batch_size: int, split: Literal['train', 'test']):
+def get_data(split: Literal['train', 'test']):
     file_path = train_file_path if split == 'train' else test_file_path
-    data = np.fromfile(file_path, dtype=np.uint16)
+    return np.fromfile(file_path, dtype=np.uint16)
+
+def get_batch(
+    seq_len: int, 
+    batch_size: int, 
+    data: np.ndarray,
+):
     n = len(data)
 
     idx = np.random.randint(0, n - seq_len, batch_size)
@@ -84,13 +90,16 @@ def get_batch(seq_len: int, batch_size: int, split: Literal['train', 'test']):
 
     return torch.tensor(res, dtype=torch.int64)
 
-def get_epoch(seq_len: int, batch_size: int, epoch_len:int, split: Literal['train', 'test']):
+def get_epoch(
+    seq_len: int, 
+    batch_size: int, 
+    epoch_len:int, 
+    data: np.ndarray,
+):
     batches = []
     for _ in range(epoch_len):
-        batch = get_batch(seq_len, batch_size, split)
+        batch = get_batch(seq_len, batch_size, data)
         batches.append((
-            # torch.tensor(batch, dtype=torch.int64),
-            # torch.tensor(batch, dtype=torch.int64)
             torch.tensor(batch[:-1], dtype=torch.int64), # input
             torch.tensor(batch[1:], dtype=torch.int64), # output
         ))
@@ -109,8 +118,10 @@ elif action == "preprocess":
     preprocess_data()
 elif action == "sample":
     print("Train:")
-    batch = get_batch(20, 50, 'train')
+    data = get_data('train')
+    batch = get_batch(20, 50, data)
     print_batch(batch)
     print("\nTest:")
-    batch = get_batch(20, 50, 'test')
+    data = get_data('test')
+    batch = get_batch(20, 50, data)
     print_batch(batch)
