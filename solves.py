@@ -16,7 +16,9 @@ class Solve:
     moves: List[str]
 
     def get_video_path(self): 
-        return 'data/videos/' + str(self.id) + '.mp4'
+        path = 'data/videos/' + str(self.id) + '.mp4'
+        path = os.path.join(os.path.dirname(__file__), path)
+        return path
 
     def download_video(self):
         print('Downloading video')
@@ -34,7 +36,10 @@ class Solve:
             print("No video found 💀")
             return
         
-        vid_canidates.download(self.get_video_path())
+        vid_canidates.download(
+            output_path='data/videos',
+            filename=str(self.id) + '.mp4',
+        )
 
         print('Video downloaded')
 
@@ -44,6 +49,8 @@ class Solve:
         if not os.path.exists(path):
             print('Video not found')
             self.download_video()
+
+        print('Loading video', path)
 
         return cv2.VideoCapture(path)
 
@@ -139,6 +146,11 @@ def save_to_fs(solves: List[Solve]):
         f.write(s)
 
 def get_from_fs():
+
+    if not os.path.exists('data/solves.json'):
+        print('No solves found')
+        return []
+
     with open('data/solves.json', 'r') as f:
         data = f.read()
         solves = json.loads(data)
@@ -150,34 +162,35 @@ def print_solves(solves: List[Solve]):
         print(solve.url)
         print(solve.moves)
 
+if __name__ == "__main__":
 
+    action = sys.argv[1]
 
-download_flag = sys.argv[1] == "download" if len(sys.argv) > 1 else False
-read_flag = sys.argv[1] == "read" if len(sys.argv) > 1 else False
+    if action == "download":
+        solves = download_all()
+        save_to_fs(solves)
 
+    elif action == "print":
+        solves = get_from_fs()
+        print_solves(solves) 
 
-if download_flag:
-    solves = download_all()
-    save_to_fs(solves)
+    elif action == "solve":
+        print("getting solves")
+        solves = get_from_fs()
 
-if read_flag:
-    solves = get_from_fs()
-    print_solves(solves) 
+        solve_id = int(sys.argv[2])
 
+        solve = solves[solve_id]
 
+        action = sys.argv[3]
+        if action == "download":
+            solve.download_video()
+        else:
+            print("No action found")
+            exit()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    else:
+        print("No action found")
+        exit()
 
 
