@@ -15,13 +15,13 @@ class VideoPlayer:
         tk.Button(
             window,
             text="Next Frame", 
-            command=self.next_frame
+            command=self.forward
         ).pack()
 
         tk.Button(
             window,
             text="Prev Frame", 
-            command=self.previous_frame
+            command=self.backwards
         ).pack()
 
         tk.Button(
@@ -31,15 +31,16 @@ class VideoPlayer:
         ).pack()
 
         tk.Button(
-                window,
-                text="Fast Backwards", 
-                command=self.fast_backwards
-                        ).pack()
+            window,
+            text="Fast Backwards", 
+            command=self.fast_backwards
+        ).pack()
+
         tk.Button(
-                window,
-                text="Pasue", 
-                command=self.pause
-                ).pack()
+            window,
+            text="Pause", 
+            command=self.pause
+        ).pack()
 
         self.label_button = tk.Button(
             window,
@@ -47,6 +48,13 @@ class VideoPlayer:
             command=self.label
         )
         self.label_button.pack()
+
+        self.remove_label_button = tk.Button(
+            window,
+            text="Remove Last Label", 
+            command=self.remove_label
+        )
+        self.remove_label_button.pack()
 
         # Frame count text view
         self.frame_count_box = tk.Entry(window)
@@ -64,18 +72,18 @@ class VideoPlayer:
 
         self.draw()
 
-        self.window.bind("<Left>", self.previous_frame)
-        self.window.bind("<Right>", self.next_frame)
+        self.window.bind("<Left>", self.backwards)
+        self.window.bind("<Right>", self.forward)
 
         self.loop()
 
     def loop(self):
         # print("Looping", self.playingState)
         if self.playingState == "fast_forwards":
-            self.next_frame()
+            self.forward(10)
 
         elif self.playingState == "fast_backwards":
-            self.previous_frame()
+            self.backwards(10)
 
         self.window.after(5, self.loop)
 
@@ -87,6 +95,11 @@ class VideoPlayer:
 
         is_moving = self.solve.is_cube_moving(self.frame_number)
         self.is_moving_label.config(text="Is Moving: " + str(is_moving))
+
+        if is_moving:
+            self.label_button.config(text="Add label: not moving")
+        else:
+            self.label_button.config(text="Add label: moving")
 
         if not self.cap or not self.cap.isOpened():
             print("No video loaded")
@@ -115,6 +128,12 @@ class VideoPlayer:
         solves.save_to_fs(self.solve_data)
         self.draw()
 
+    def remove_label(self):
+        print("Remove Label")
+        self.solve.remove_last_action()
+        solves.save_to_fs(self.solve_data)
+        self.draw()
+
     def fast_forwards(self):
         self.playingState = "fast_forwards"
 
@@ -124,12 +143,12 @@ class VideoPlayer:
     def pause(self):
         self.playingState = "paused"
 
-    def previous_frame(self):
-        self.frame_number -= 1
+    def backwards(self, amount = 1):
+        self.frame_number -= amount
         self.draw()
 
-    def next_frame(self):
-        self.frame_number += 1
+    def forward(self, amount = 1):
+        self.frame_number += amount
         self.draw()
 
 if __name__ == "__main__":
