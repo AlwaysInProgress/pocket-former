@@ -142,9 +142,12 @@ def download_one_by_id(id: int):
 
     yt_url = iframe['src']
 
+    # Check if video is available
+
     if type(yt_url) is not str:
         print("Multiple iframes found")
         return
+
 
     # map to list of hrefs
     urls: List[str] = list(map(lambda a: a.get("href"), soup.find_all('a')))
@@ -193,6 +196,8 @@ class Solves:
                 print('Adding solve' + str(i))
                 solves.append(solve)
 
+        print('Solves found: ', len(solves))
+
         # merge solves with the same url
         solve_dict = {}
         
@@ -204,11 +209,29 @@ class Solves:
         
         merged_solves = list(solve_dict.values())
 
+        print('Merged solves found: ', len(merged_solves))
+        
+        good_solves = []
+        # Filter videos that dont have good videos
+        for solve in merged_solves:
+            pytube = YouTube(solve.url)
+            try:
+                pytube.check_availability()
+            except:
+                print("Video not available")
+                continue
+            if pytube.length > 10 * 60:
+                print("Video too long")
+                continue
+            good_solves.append(solve)
+
         # Update ids
-        for i, solve in enumerate(merged_solves):
+        for i, solve in enumerate(good_solves):
             solve.id = i
 
-        for solve in merged_solves:
+        print('Good solves found: ', len(good_solves))
+
+        for solve in good_solves:
             solve.save_to_fs()
 
         return merged_solves
@@ -244,7 +267,7 @@ if __name__ == "__main__":
         amount = int(sys.argv[2]) if len(sys.argv) > 2 else 100
         solves.download_all(amount)
 
-    if action == "download_videos":
+    elif action == "download_videos":
         solves.download_all_videos()
 
     elif action == "solve":
