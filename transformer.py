@@ -180,8 +180,8 @@ def prompt(t: Transformer, args: Args, checkpoint: str = None) -> str:
     print("Prompt: ", args.prompt)
 
     enc = tiktoken.get_encoding("gpt2")
-    # encoded_p = enc.encode(args.prompt)
-    encoded_p = get_batch(args.seq_len, 1, 'test').squeeze().tolist()
+    encoded_p = enc.encode(args.prompt)
+    # encoded_p = get_batch(args.seq_len, 1, 'test').squeeze().tolist()
     print("prompt decoded: ", enc.decode(encoded_p))
     # eos = torch.zeros((seq_len)) # eos token
     x = torch.tensor(encoded_p).unsqueeze(0).to(device)
