@@ -11,11 +11,12 @@ from pytube import YouTube
 
 @dataclass
 class Solve:
-    id: int
-    web_id: int
-    url: str
-    moves: List[str]
+    id: int # folder index
+    web_id: int # index from website, we dont want to use this as the index
+    url: str # video url
+    moves: List[str] # list of notation moves
     # each entry is a frame number of when the cube starts moving or stops moving
+    # even = start moving, odd = stop moving
     action_frames: List[int] = field(default_factory=list)
 
     def get_dir_path(self):
