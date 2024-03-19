@@ -213,6 +213,13 @@ class Solves:
 
         return merged_solves
 
+    def download_all_videos(self):
+        solves = os.listdir('data/solves')
+        for solve in solves:
+            solve = Solve.get_from_fs(int(solve))
+            if solve is not None:
+                solve.download_video()
+
     def get_solves_count(self):
         return len(os.listdir('data/solves'))
 
@@ -236,6 +243,9 @@ if __name__ == "__main__":
     if action == "download":
         amount = int(sys.argv[2]) if len(sys.argv) > 2 else 100
         solves.download_all(amount)
+
+    if action == "download_videos":
+        solves.download_all_videos()
 
     elif action == "solve":
         solve_id = int(sys.argv[2])
