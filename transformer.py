@@ -26,7 +26,7 @@ class Args:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class AttentionHead(nn.Module):
-    def __init__(self, hidden_dim, qkv_dim, dropout=0.):
+    def __init__(self, hidden_dim, qkv_dim, dropout=0.1):
         super(AttentionHead, self).__init__()
         self.hidden_dim = hidden_dim
         self.qkv_dim = qkv_dim
@@ -57,7 +57,7 @@ class AttentionHead(nn.Module):
         return res
 
 class Transformer(nn.Module):
-    def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0., num_blocks=6, train=False, vocab_size=50257):
+    def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0.1, num_blocks=6, train=False, vocab_size=50257):
         super(Transformer, self).__init__()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.hidden_dim = hidden_dim
@@ -81,13 +81,14 @@ class Transformer(nn.Module):
             mha_projection = nn.Linear(self.hidden_dim, self.hidden_dim)
             mlp = nn.Sequential(
                 nn.Linear(self.hidden_dim, 4*self.hidden_dim),
-                nn.ReLU(),
+                # nn.ReLU(),
+                nn.GELU(),
                 nn.Linear(4*self.hidden_dim, self.hidden_dim),
                 nn.Dropout(dropout)
             )
             block = nn.ModuleList([attention_heads, mha_projection, mlp]).to(device)
             self.blocks.append(block)
-
+        
         self.to(device)
 
         num_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -106,13 +107,14 @@ class Transformer(nn.Module):
             attn = self.dropout(x + self.layer_norm(attn)) # add and norm
             res = block[2](attn) + self.layer_norm(attn) # mlp
             x = res
+        res = self.layer_norm(x)
         return self.lm_head(res)
 
-def train_epoch(model, optimizer, args, train_dataset):
+def train_epoch(model: Transformer, optimizer: torch.optim.Optimizer, args: Args, test_dataset: np.ndarray, epoch_len: int = 10000) -> float:
     train_loader = get_epoch(
         args.seq_len, 
         args.bs, 
-        epoch_len=10000, 
+        epoch_len=epoch_len, 
         dataset=train_dataset
     )
     model.train()
@@ -133,11 +135,11 @@ def train_epoch(model, optimizer, args, train_dataset):
 
     return loss_avg
 
-def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray) -> float:
+def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray, epoch_len: int = 100) -> float:
     val_loader = get_epoch(
         args.seq_len, 
         args.bs, 
-        epoch_len=10, 
+        epoch_len=epoch_len, 
         dataset=test_dataset
     )
     model.train()
@@ -157,26 +159,28 @@ def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray) -> floa
 
 
 def train(model: Transformer, args: Args, train_dataset: np.ndarray, test_dataset: np.ndarray):
-    optimizer = torch.optim.AdamW(t.parameters(), lr=1e-4, weight_decay=0) # 1e-1)
+    optimizer = torch.optim.AdamW(t.parameters(), lr=2.5e-4, weight_decay=1e-2)
     t.train()
     for epoch in range(args.num_epochs):
-        train_loss = train_epoch(model, optimizer, args, train_dataset)
-        val_loss = train_epoch(t, optimizer, args, test_dataset)
-        print(f'train loss for epoch {epoch}: {train_loss}')
+        print(f"Training Epoch {epoch + 1}...")
+        train_loss = train_epoch(model, optimizer, args, train_dataset, epoch_len=10)
+        print(f"Evaluating Epoch {epoch + 1}...")
+        val_loss = eval_epoch(t, args, test_dataset, epoch_len=10)
+        tokens_seen = (epoch + 1) * args.bs * args.seq_len
+        # print(f'train loss for epoch {epoch + 1}: {train_loss}')
         print(f'train perplexity: {math.exp(train_loss)}')
-        print(f'val loss for epoch {epoch}: {val_loss}')
+        # print(f'val loss for epoch {epoch + 1}: {val_loss}')
         print(f'val perplexity: {math.exp(val_loss)}')
-        save_model(model, "checkpoints")
+        print(f'total tokens seen: {tokens_seen}')
+        save_model(model, "checkpoints", f"epoch_{epoch + 1}_{tokens_seen}_tokens")
 
-def save_model(model, path, name=None):
+def save_model(model, path, name=""):
     if not os.path.exists(path):
         os.makedirs(path)
-    if name is None:
-        datetime_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        name = f"model_{datetime_str}"
-
-    torch.save(model.state_dict(), os.path.join(path, name) + ".pt")
-    print(f"Model saved to {os.path.join(path, name)} + .pt")
+    
+    datetime_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    torch.save(model.state_dict(), os.path.join(path, name) + datetime_str + ".pt")
+    print(f"Model saved to {os.path.join(path, name)}.pt")
 
 def pad_sequence(seq: torch.Tensor, seq_len: int, device: torch.device, pad_index: int = 0) -> torch.Tensor:
     # seq has shape (bs, seq_len)
@@ -294,9 +298,10 @@ if __name__ == "__main__":
     )
 
     t = Transformer(
-        seq_len=args.seq_len, 
         hidden_dim=args.hidden_dim, 
+        seq_len=args.seq_len, 
         num_heads=args.num_heads,
+        dropout=0.1,
         num_blocks=args.num_blocks,
         train=False
     )
