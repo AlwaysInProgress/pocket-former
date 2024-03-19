@@ -55,3 +55,11 @@ Train the model:
 ```bash
 python transformer.py --bs 32 --seq_len 16 --hidden_dim 512 --num_heads 8  --train
 ```
+
+## Labeler
+
+```bash
+python solves-labeler.py
+```
+
+

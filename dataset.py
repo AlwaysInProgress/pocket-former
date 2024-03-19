@@ -5,6 +5,7 @@ import os
 import sys
 import numpy as np
 import torch
+from tqdm import tqdm
 
 small_wikipedia_link = "https://raw.githubusercontent.com/arpytanshu/latent-semantic-indexing/master/wikipedia_utf8_filtered_20pageviews-1K.tsv"
 input_file_path = os.path.join(os.path.dirname(__file__), 'data/wiki-data.txt')
@@ -28,19 +29,30 @@ def preprocess_data():
     with open(input_file_path, 'r') as f:
         data = f.read()
 
+    print("File loaded")
+
     lines = data.split("\n")
 
-    lines = [x for x in lines if len(x) > 0]
-    lines = [line.split(" ", 1)[1].strip() for line in lines] # Remove unwanted starting tokens
-    lines = [enc.encode(x) for x in lines]
-    for line in lines:
-        line.append(end_of_sentence_token)
-    lines = [item for sublist in lines for item in sublist]
+    def process_line(line: str):
+        if len(line) == 0:
+            return None
+        line = line.split(" ", 1)[1].strip()
+        tokens = enc.encode(line)
+        tokens.append(end_of_sentence_token)
+        return tokens
 
-    n = len(lines)
+    all_tokens = []
+    for line in tqdm(lines):
+        line = process_line(line)
+        if line is None:
+            continue
+        all_tokens.extend(line)
+
+
+    n = len(all_tokens)
     split_percent = 0.9
-    train_data = lines[:int(n * split_percent)]
-    test_data = lines[int(n * split_percent):]
+    train_data = all_tokens[:int(n * split_percent)]
+    test_data = all_tokens[int(n * split_percent):]
 
     print(f"# of train tokens: {len(train_data)}")
     print(f"# of test tokens: {len(test_data)}")
