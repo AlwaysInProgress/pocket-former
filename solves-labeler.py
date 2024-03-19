@@ -41,18 +41,27 @@ class VideoPlayer:
                 command=self.pause
                 ).pack()
 
+        self.label_button = tk.Button(
+            window,
+            text="Label is Moving", 
+            command=self.label
+        )
+        self.label_button.pack()
+
         # Frame count text view
         self.frame_count_box = tk.Entry(window)
         self.frame_count_box.pack()
+
+        self.is_moving_label = tk.Label(window, text="Is Moving: ")
+        self.is_moving_label.pack()
 
         self.canvas = tk.Canvas(window, width=640, height=480)
         self.canvas.pack()
 
         self.solve_data = solves.get_from_fs()
-        solve = self.solve_data[0]
-        video = solve.get_video()
+        self.solve = self.solve_data[0]
+        self.cap = self.solve.get_video()
 
-        self.cap = video
         self.draw()
 
         self.window.bind("<Left>", self.previous_frame)
@@ -68,13 +77,16 @@ class VideoPlayer:
         elif self.playingState == "fast_backwards":
             self.previous_frame()
 
-        self.window.after(10, self.loop)
+        self.window.after(5, self.loop)
 
     def draw(self):
         print("Draw")
         # Draw the frame number
         self.frame_count_box.delete(0, tk.END)
         self.frame_count_box.insert(0, str(self.frame_number))
+
+        is_moving = self.solve.is_cube_moving(self.frame_number)
+        self.is_moving_label.config(text="Is Moving: " + str(is_moving))
 
         if not self.cap or not self.cap.isOpened():
             print("No video loaded")
@@ -96,6 +108,12 @@ class VideoPlayer:
         self.canvas.create_image(0, 0, anchor=tk.NW, image=photo)
         self.canvas.image = photo
         self.canvas.pack()
+
+    def label(self):
+        print("Label")
+        self.solve.new_action(self.frame_number)
+        solves.save_to_fs(self.solve_data)
+        self.draw()
 
     def fast_forwards(self):
         self.playingState = "fast_forwards"

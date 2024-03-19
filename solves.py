@@ -1,7 +1,7 @@
 import os
 import sys
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
@@ -14,6 +14,22 @@ class Solve:
     id: int
     url: str
     moves: List[str]
+    # each entry is a frame number of when the cube starts moving or stops moving
+    action_frames: List[int] = field(default_factory=list)
+
+    def is_cube_moving(self, frame_num: int):
+        is_moving = False
+        for frame in self.action_frames:
+            if frame_num < frame:
+                break
+            is_moving = not is_moving
+        return is_moving
+
+    def new_action(self, frame_num: int):
+        self.action_frames.append(frame_num)
+
+    def remove_last_action(self):
+        self.action_frames.pop()
 
     def get_video_path(self): 
         path = 'data/videos/' + str(self.id) + '.mp4'
@@ -54,6 +70,13 @@ class Solve:
 
         cap = cv2.VideoCapture(path)
         return cap
+    
+    def print(self):
+        print("Id:", self.id)
+        print("Url:", self.url)
+        print("Moves:", self.moves)
+        print("Action Frames:", self.action_frames)
+    
 
 
 def download_one_by_id(id: int):
@@ -186,6 +209,8 @@ if __name__ == "__main__":
         action = sys.argv[3]
         if action == "download":
             solve.download_video()
+        elif action == "print":
+            solve.print()
         else:
             print("No action found")
             exit()
