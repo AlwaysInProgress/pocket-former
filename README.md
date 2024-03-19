@@ -7,9 +7,14 @@ A playground for implementing transformer architectures.
 
 ## Wiki Dataset
 
-Download and preprocess the dataset:
+Download the dataset:
 ```bash
 python dataset.py download
+```
+
+Process the dataset:
+```bash
+python dataset.py preprocess
 ```
 
 Sample data from the dataset:

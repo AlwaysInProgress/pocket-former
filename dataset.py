@@ -21,11 +21,9 @@ def get_fake_data(args):
     labels = [torch.randint(0, 50257, (args.bs, args.seq_len)) for _ in range(10)]
     return list(zip(batches, labels))
 
-def downloadData():
-    if not os.path.exists(input_file_path):
-        data = requests.get(small_wikipedia_link).text
-        with open(input_file_path, 'w') as f:
-            f.write(data)
+
+def preprocess_data():
+    print("Preprocessing data")
 
     with open(input_file_path, 'r') as f:
         data = f.read()
@@ -44,8 +42,17 @@ def downloadData():
     train_data = lines[:int(n * split_percent)]
     test_data = lines[int(n * split_percent):]
 
+    print(f"# of train tokens: {len(train_data)}")
+    print(f"# of test tokens: {len(test_data)}")
+
     np.array(train_data, dtype=np.uint16).tofile(train_file_path)
     np.array(test_data, dtype=np.uint16).tofile(test_file_path)
+
+def download_data():
+    if not os.path.exists(input_file_path):
+        data = requests.get(small_wikipedia_link).text
+        with open(input_file_path, 'w') as f:
+            f.write(data)
 
 def get_batch(seq_len: int, batch_size: int, split: Literal['train', 'test']):
     file_path = train_file_path if split == 'train' else test_file_path
@@ -75,14 +82,13 @@ def print_batch(samples: torch.Tensor):
     for sample in samples:
         print(enc.decode(sample.tolist()))
 
+action = sys.argv[1] if len(sys.argv) > 1 else None
 
-download_flag = sys.argv[1] == "download" if len(sys.argv) > 1 else False
-sample_flag = sys.argv[1] == "sample" if len(sys.argv) > 1 else False
-
-if download_flag:
-    downloadData()
-
-if sample_flag:
+if action == "download":
+    download_data()
+elif action == "preprocess":
+    preprocess_data()
+elif action == "sample":
     print("Train:")
     batch = get_batch(20, 50, 'train')
     print_batch(batch)
