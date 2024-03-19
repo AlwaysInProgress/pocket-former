@@ -41,9 +41,9 @@ python transformer.py --bs 32 --seq_len 16 --hidden_dim 512 --num_heads 8  --tra
 
 ## Solves Dataset
 
-Download and preprocess the solves data:
+Download and preprocess the first 20 solves:
 ```bash
-python solves.py download
+python solves.py download 20
 ```
 
 View info for solve with id 0:

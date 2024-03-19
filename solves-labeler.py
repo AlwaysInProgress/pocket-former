@@ -69,7 +69,9 @@ class VideoPlayer:
         self.canvas = tk.Canvas(window, width=640, height=480)
         self.canvas.pack()
 
-        solve = solves.Solve.get_from_fs(22)
+        self.solvedb = solves.Solves()
+
+        solve = self.solvedb.get_solve_by_index(9)
         if solve is None:
             print("No solve found")
             return
@@ -91,8 +93,6 @@ class VideoPlayer:
 
         self.window.bind("<Left>", self.backwards)
         self.window.bind("<Right>", self.forward)
-
-
 
         self.loop()
 

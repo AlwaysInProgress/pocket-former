@@ -12,6 +12,7 @@ from pytube import YouTube
 @dataclass
 class Solve:
     id: int
+    web_id: int
     url: str
     moves: List[str]
     # each entry is a frame number of when the cube starts moving or stops moving
@@ -178,51 +179,60 @@ def download_one_by_id(id: int):
     # Remove parenthesis
     moves = list(map(lambda m: m.replace("(", "").replace(")", ""), moves))
 
-    print(moves)
-
-    solve = Solve(id=id, url=yt_url, moves=moves)
+    solve = Solve(id=id, web_id=id, url=yt_url, moves=moves)
 
     return solve
 
 
-def download_all(amount: int = 100):
-    solves = []
-    for i in range(1, amount + 1):
-        solve = download_one_by_id(i)
-        if solve is not None:
-            print('Adding solve' + str(i))
-            solves.append(solve)
+class Solves:
+    def download_all(self, amount: int = 100):
+        solves = []
+        for i in range(1, amount + 1):
+            solve = download_one_by_id(i)
+            if solve is not None:
+                print('Adding solve' + str(i))
+                solves.append(solve)
 
-    # merge solves with the same url
-    solve_dict = {}
-    
-    for solve in solves:
-        if solve.url in solve_dict:
-            solve_dict[solve.url].moves.extend(solve.moves)
-        else:
-            solve_dict[solve.url] = Solve(solve.id, solve.url, solve.moves)
-    
-    merged_solves = list(solve_dict.values())
+        # merge solves with the same url
+        solve_dict = {}
+        
+        for solve in solves:
+            if solve.url in solve_dict:
+                solve_dict[solve.url].moves.extend(solve.moves)
+            else:
+                solve_dict[solve.url] = Solve(solve.id, solve.web_id, solve.url, solve.moves)
+        
+        merged_solves = list(solve_dict.values())
 
-    for solve in merged_solves:
-        solve.save_to_fs()
+        # Update ids
+        for i, solve in enumerate(merged_solves):
+            solve.id = i
 
-    return merged_solves
+        for solve in merged_solves:
+            solve.save_to_fs()
 
+        return merged_solves
 
-def print_solves(solves: List[Solve]):
-    for solve in solves:
-        print(solve.id)
-        print(solve.url)
-        print(solve.moves)
+    def get_solve_by_index(self, idx: int):
+        solves = os.listdir('data/solves')
+
+        if idx >= len(solves):
+            print('Index out of range')
+            return None
+
+        solveId = int(solves[idx])
+
+        return Solve.get_from_fs(solveId)
+
 
 if __name__ == "__main__":
+    solves = Solves()
 
     action = sys.argv[1]
 
     if action == "download":
         amount = int(sys.argv[2]) if len(sys.argv) > 2 else 100
-        download_all(amount)
+        solves.download_all(amount)
 
     elif action == "solve":
         solve_id = int(sys.argv[2])
