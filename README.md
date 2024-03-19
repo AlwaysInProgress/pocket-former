@@ -7,12 +7,12 @@ A playground for implementing transformer architectures.
 
 ## Wiki Dataset
 
-Download the dataset:
+Download the dataset to `data/wiki-data.txt`:
 ```bash
 python dataset.py download
 ```
 
-Process the dataset:
+Process the dataset from `data/wiki-data.txt`:
 ```bash
 python dataset.py preprocess
 ```
