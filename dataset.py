@@ -63,8 +63,10 @@ def get_epoch(seq_len: int, batch_size: int, epoch_len:int, split: Literal['trai
     for _ in range(epoch_len):
         batch = get_batch(seq_len, batch_size, split)
         batches.append((
-            torch.tensor(batch, dtype=torch.int64),
-            torch.tensor(batch, dtype=torch.int64)
+            # torch.tensor(batch, dtype=torch.int64),
+            # torch.tensor(batch, dtype=torch.int64)
+            torch.tensor(batch[:-1], dtype=torch.int64), # input
+            torch.tensor(batch[1:], dtype=torch.int64), # output
         ))
     return batches
 
