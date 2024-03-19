@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import List, Literal
 import tiktoken
 import requests
 import os
@@ -37,17 +37,24 @@ def preprocess_data():
         if len(line) == 0:
             return None
         line = line.split(" ", 1)[1].strip()
-        tokens = enc.encode(line)
-        tokens.append(end_of_sentence_token)
-        return tokens
+        return line
 
-    all_tokens = []
+    print("Processing lines")
+    processed_lines: List[str] = []
     for line in tqdm(lines):
         line = process_line(line)
-        if line is None:
-            continue
-        all_tokens.extend(line)
+        if line is not None:
+            processed_lines.append(line)
 
+    print("Encoding tokens")
+    all_tokens = enc.encode_ordinary_batch(processed_lines)
+
+    # Add end of sentence token
+    print("Adding end of sentence token")
+    all_tokens = [token + [end_of_sentence_token] for token in all_tokens]
+
+    # Flatten the list
+    all_tokens = [token for sublist in all_tokens for token in sublist]
 
     n = len(all_tokens)
     split_percent = 0.9
