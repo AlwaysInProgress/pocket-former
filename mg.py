@@ -8,6 +8,7 @@ from urllib.parse import urlparse, parse_qs
 import json
 import cv2
 from pytube import YouTube
+from torch.utils.data import Dataset
 
 mg_path = 'data/mg/'
 
@@ -125,6 +126,9 @@ class MG:
         cap = cv2.VideoCapture(path)
         return cap
 
+    def get_frame_count(self):
+        return len(os.listdir(mg_dir_path(self.id) + 'frames/'))
+
 def download_one_by_id(id: int):
     url = "https://reco.nz/solve/" + str(id)
     response = requests.get(url)
@@ -188,7 +192,17 @@ def download_one_by_id(id: int):
     return solve
 
 
-class MGDataset:
+class MGDataset(Dataset):
+    def __init__(self):
+        pass
+
+    def __len__(self):
+        mgs = self.get_all_mgs()
+        item_count = 0
+        for mg in mgs:
+            item_count += mg.get_frame_count() - 2
+        return item_count
+
     def download_all(self, amount: int = 100):
         solves = []
         for i in range(1, amount + 1):
@@ -238,14 +252,29 @@ class MGDataset:
         return merged_solves
 
     def download_all_videos(self):
-        solves = os.listdir(mg_path)
-        for solve in solves:
-            solve = MG.get_from_fs(int(solve))
-            if solve is not None:
-                solve.download_video()
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            mg.download_video()
+
+    def process_all_frames(self):
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            mg.process_frames()
 
     def get_count(self):
         return len(os.listdir(mg_path))
+
+    def get_all_mgs(self):
+        mgs = os.listdir(mg_path)
+        all_mgs = []
+
+        for mg in mgs:
+            mg = MG.get_from_fs(int(mg))
+            if mg is not None:
+                all_mgs.append(mg)
+
+        return all_mgs
+
 
     def get_by_index(self, idx: int):
         solves = os.listdir(mg_path)
