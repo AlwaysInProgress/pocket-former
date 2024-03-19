@@ -51,17 +51,17 @@ python solves.py download 20
 
 View info for solve with id 0:
 ```bash
-python solves.py solves 0 print
+python solves.py solve 0 print
 ```
 
 Download a video for solve with id 0:
 ```bash
-python solves.py solves 0 download
+python solves.py solve 0 download
 ```
 
 Process all the frames for solve with id 0:
 ```bash
-python solves.py solves 0 process
+python solves.py solve 0 process
 ```
 
 Launch the labeler
