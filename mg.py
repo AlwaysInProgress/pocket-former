@@ -14,11 +14,21 @@ import numpy as np
 
 mg_path = 'data/mg/'
 
+annotations_path = 'annotations'
+
+if not os.path.exists(annotations_path):
+    os.makedirs(annotations_path)
+
 def mg_dir_path(id: int):
     path = mg_path + str(id) + '/'
     path = os.path.join(os.path.dirname(__file__), path)
     if not os.path.exists(path):
         os.makedirs(path)
+    return path
+
+def mg_annotations_path(web_id: int):
+    path = annotations_path + '/' + str(web_id) + '.json'
+    path = os.path.join(os.path.dirname(__file__), path)
     return path
 
 @dataclass
@@ -48,19 +58,38 @@ class MG:
 
     @staticmethod
     def get_from_fs(id: int):
-        print('Loading from fs', id)
         path = mg_dir_path(id) + 'data.json'
         if not os.path.exists(path):
             print('Mg not found')
             return None
+
         with open(path, 'r') as f:
             data = f.read()
-            return MG(**json.loads(data))
+            mg = MG(**json.loads(data))
+
+        annotations_path = mg_annotations_path(id)
+        if not os.path.exists(annotations_path):
+            return mg
+        with open(annotations_path, 'r') as f:
+            data = f.read()
+            annotations = json.loads(data)
+            mg.action_frames = annotations["action_frames"]
+            mg.is_test = annotations["is_test"]
 
     def save_to_fs(self):
         print('Saving to fs: ', self.id)
         with open(mg_dir_path(self.id) + 'data.json', 'w') as f:
             s = json.dumps(self.__dict__)
+            f.write(s)
+        annotations_path = mg_annotations_path(self.web_id)
+        with open(annotations_path, 'w') as f:
+            # Make dict only with data we (the inganeers) manually annotated
+            data = {
+                "id": self.web_id,
+                "action_frames": self.action_frames,
+                "is_test": self.is_test
+            }
+            s = json.dumps(data)
             f.write(s)
     
     def print(self):
@@ -68,6 +97,7 @@ class MG:
         print("Url:", self.url)
         print("Moves:", self.moves)
         print("Action Frames:", self.action_frames)
+        print("Is test:", self.is_test)
 
     def download_video(self):
         print('Downloading video')
