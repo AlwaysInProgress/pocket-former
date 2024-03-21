@@ -22,6 +22,7 @@ class Args:
     train: bool
     checkpoint: Optional[str]
     num_blocks: int
+    epoch_len: int
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -66,6 +67,8 @@ class Transformer(nn.Module):
         assert self.hidden_dim % self.num_heads == 0
         self.vocab_size = vocab_size
         self.num_blocks = num_blocks
+        self.dropout = dropout
+
         self.embedding = nn.Embedding(self.vocab_size, self.hidden_dim).to(device)
         self.positional_encoding = nn.Parameter(torch.randn((self.seq_len, self.hidden_dim))).to(device) 
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
@@ -127,8 +130,9 @@ def train_epoch(model: Transformer, optimizer: torch.optim.Optimizer, args: Args
         output = model(batch).view((-1, model.vocab_size))
         probs = torch.softmax(output, dim=-1)
         loss = nn.functional.cross_entropy(output, labels)
-        loss.backward()
-        optimizer.step()
+        if torch.isfinite(loss):
+            loss.backward()
+            optimizer.step()
         loss_sum += loss.item()
 
     loss_avg = loss_sum / len(train_loader)
@@ -158,29 +162,31 @@ def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray, epoch_l
     return loss_avg    
 
 
-def train(model: Transformer, args: Args, train_dataset: np.ndarray, test_dataset: np.ndarray):
+def train(model: Transformer, args: Args, train_dataset: np.ndarray, test_dataset: np.ndarray, epoch_len: int = 1000):
     optimizer = torch.optim.AdamW(t.parameters(), lr=2.5e-4, weight_decay=1e-2)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     t.train()
     for epoch in range(args.num_epochs):
         print(f"Training Epoch {epoch + 1}...")
-        train_loss = train_epoch(model, optimizer, args, train_dataset, epoch_len=10)
+        train_loss = train_epoch(model, optimizer, args, train_dataset, epoch_len=epoch_len)
         print(f"Evaluating Epoch {epoch + 1}...")
-        val_loss = eval_epoch(t, args, test_dataset, epoch_len=10)
-        tokens_seen = (epoch + 1) * args.bs * args.seq_len
-        # print(f'train loss for epoch {epoch + 1}: {train_loss}')
+        val_loss = eval_epoch(t, args, test_dataset, epoch_len=100)
+        tokens_seen = (epoch + 1) * args.bs * args.seq_len * epoch_len
+        print(f'train loss for epoch {epoch + 1}: {train_loss}')
         print(f'train perplexity: {math.exp(train_loss)}')
-        # print(f'val loss for epoch {epoch + 1}: {val_loss}')
+        print(f'val loss for epoch {epoch + 1}: {val_loss}')
         print(f'val perplexity: {math.exp(val_loss)}')
         print(f'total tokens seen: {tokens_seen}')
-        save_model(model, "checkpoints", f"epoch_{epoch + 1}_{tokens_seen}_tokens")
+        save_model(model, "checkpoints", f"epoch_{epoch + 1}_{tokens_seen}_tokens_ppl_{round(math.exp(val_loss), 2)}_")
 
 def save_model(model, path, name=""):
     if not os.path.exists(path):
         os.makedirs(path)
     
     datetime_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    torch.save(model.state_dict(), os.path.join(path, name) + datetime_str + ".pt")
-    print(f"Model saved to {os.path.join(path, name)}.pt")
+    name = name + datetime_str + '.pt'
+    print(f"Saving model to {os.path.join(path, name)}")
+    torch.save(model.state_dict(), os.path.join(path, name) + datetime_str + '.pt')
 
 def pad_sequence(seq: torch.Tensor, seq_len: int, device: torch.device, pad_index: int = 0) -> torch.Tensor:
     # seq has shape (bs, seq_len)
@@ -281,6 +287,7 @@ if __name__ == "__main__":
     parser.add_argument("--prompt", type=str)
     parser.add_argument("--checkpoint", type=str)
     parser.add_argument("--num_blocks", type=int, default=6)
+    parser.add_argument("--epoch_len", type=int, default=1000)
     args = parser.parse_args()
 
 
@@ -294,7 +301,8 @@ if __name__ == "__main__":
         train=args.train,
         prompt=args.prompt,
         checkpoint=args.checkpoint,
-        num_blocks=args.num_blocks
+        num_blocks=args.num_blocks,
+        epoch_len=args.epoch_len
     )
 
     t = Transformer(
@@ -311,7 +319,7 @@ if __name__ == "__main__":
     test_dataset = get_data('test')
 
     if args.train:
-        train(t, args, train_dataset, test_dataset)
+        train(t, args, train_dataset, test_dataset, epoch_len=args.epoch_len)
     elif args.prompt is not None:
         res = prompt(t=t, args=args, dataset=test_dataset)
         print("Response:", res)
