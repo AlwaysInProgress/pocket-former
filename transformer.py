@@ -202,15 +202,14 @@ def prompt(t: Transformer, args: Args, checkpoint: str = None, dataset: np.ndarr
 
     enc = tiktoken.get_encoding("gpt2")
     encoded_p = get_batch(seq_len=args.seq_len, batch_size=1, dataset=dataset)
-    # encoded_p = enc.encode(args.prompt)
+    # encoded_p = torch.tensor(enc.encode(args.prompt)).unsqueeze(0)
     print("Prompt: ", enc.decode(encoded_p.squeeze().tolist()))
+    # print("Prompt: ", enc.decode(encoded_p))
     
     if args.prompt is None:
         print("Prompt is None")
         return "Error: prompt is None"
 
-    # encoded_p = enc.encode(args.prompt)
-    encoded_p = get_batch(seq_len=args.seq_len, batch_size=1, dataset=dataset)
     # eos = torch.zeros((seq_len)) # eos token
     x = torch.tensor(encoded_p).to(device)
     max_gen_tokens = 5

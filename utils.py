@@ -2,6 +2,7 @@ from turn_classifier import TurnClassifier
 import torch
 import cv2
 from typing import Tuple
+import numpy as np
 
 def viz_mg_data(data: Tuple[torch.Tensor, int], model: TurnClassifier):
     images, label = data
@@ -22,3 +23,11 @@ def viz_mg_data(data: Tuple[torch.Tensor, int], model: TurnClassifier):
         cv2.putText(image, percent_str, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.imshow("image", image)
         cv2.waitKey(0)
+
+def center_crop(img: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
+    h, w = img.shape[:2]
+    x1 = (w - size[0]) // 2
+    y1 = (h - size[1]) // 2
+    x2 = x1 + size[0]
+    y2 = y1 + size[1]
+    return img[y1:y2, x1:x2]

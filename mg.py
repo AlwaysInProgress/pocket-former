@@ -12,6 +12,7 @@ from torch.utils.data import Dataset
 import torch
 import numpy as np
 import argparse
+from utils import *
 
 mg_path = 'data/mg/'
 
@@ -170,14 +171,6 @@ class MG:
 
         return num_frames
 
-    def center_crop(self, img: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
-        h, w = img.shape[:2]
-        x1 = (w - size[0]) // 2
-        y1 = (h - size[1]) // 2
-        x2 = x1 + size[0]
-        y2 = y1 + size[1]
-        return img[y1:y2, x1:x2]
-
     def get_frame_label(self, frame_num: int) -> Literal["moving", "not_moving", "inspection", "unlabeled"]:
         if len(self.action_frames) == 0:
             return "unlabeled"
@@ -197,7 +190,7 @@ class MG:
             return None
         path = mg_dir_path(self.id) + 'frames/' + str(frame_num) + '.jpg'
         img = cv2.imread(path)
-        img = self.center_crop(img, (224, 224))
+        img = center_crop(img, (224, 224))
 
         # preprocess image
         img_tensor = torch.from_numpy(img)
@@ -282,6 +275,7 @@ class MgDatapoint(Dataset):
                 raise IndexError
             frames.append(frame)
         label = self.mg.get_frame_label(self.starting_frame)
+        print('Label from load_item:', label)
         return torch.stack(frames), label
         
     def view(self, checkpoint=None):
