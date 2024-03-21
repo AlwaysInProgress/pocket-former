@@ -11,6 +11,7 @@ from pytube import YouTube
 from torch.utils.data import Dataset
 import torch
 import numpy as np
+import argparse
 
 mg_path = 'data/mg/'
 
@@ -185,8 +186,6 @@ class MG:
         # preprocess image
         img_tensor = torch.from_numpy(img)
         img_tensor = img_tensor.permute(2, 0, 1).float() / 255.0
-        print("img_tensor.shape", img_tensor.shape)
-        print("img_tensor max", img_tensor.max())
         return img_tensor
 
 
@@ -270,9 +269,17 @@ class MgDatapoint(Dataset):
         # return (frames, is_moving)
         return torch.stack(frames), int(is_moving)
         
-    def view(self):
+    def view(self, checkpoint=None):
         (frames, is_moving) = self.load_item()
         print(frames[0].shape)
+
+        if checkpoint is not None:
+            model = TurnClassifier(hidden_dim=1024, num_classes=2, enc_name="vit-base", num_frames=2)
+            model.load_state_dict(torch.load(checkpoint))
+            model.eval()
+            with torch.no_grad():
+                pred = model(frames)
+                print('Prediction in view:', pred)
 
         print('Is moving:', is_moving)
         for frame in frames:
@@ -405,6 +412,13 @@ class MGDataset(Dataset):
 
 
 if __name__ == "__main__":
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--bs", type=int, default=32)
+    # parser.add_argument("--lr", type=float, default=1e-4)
+    # parser.add_argument("--epochs", type=int, default=10)
+    # parser.add_argument("--checkpoint", type=str, default=None)
+    # args = parser.parse_args()
+        
     dataset = MGDataset()
 
     action = sys.argv[1]
@@ -423,7 +437,11 @@ if __name__ == "__main__":
         idx = int(sys.argv[2])
         item = dataset.get_data_point(idx)
         if item is not None:
-            item.view()
+            # if args.checkpoint is not None:
+            if len(sys.argv) > 3:
+                item.view(sys.argv[3]) # checkpoint
+            else:
+                item.view()
         else:
             print("Item not found")
 

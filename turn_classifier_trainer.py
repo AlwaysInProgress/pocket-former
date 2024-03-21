@@ -6,6 +6,9 @@ from tqdm import tqdm
 import argparse
 from mg import MGDataset
 from torch.utils.data import DataLoader
+import datetime
+import cv2
+from utils import *
 
 def train_epoch(model, optimizer, args, train_loader, device):
     model.train()
@@ -19,6 +22,7 @@ def train_epoch(model, optimizer, args, train_loader, device):
         print("batch shape: ", batch.shape)
         print("output shape: ", output.shape)
         print("labels shape: ", labels.shape)
+        print("labels: ", labels)
         loss = nn.functional.cross_entropy(output, labels)
         print("loss: ", loss.item())
         loss.backward()
@@ -47,16 +51,25 @@ def eval_epoch(model, args, val_loader, device):
 
 def train(model, args, train_loader, val_loader, device):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    best_val_loss = float("inf")
     for epoch in range(args.epochs):
         train_loss = train_epoch(model, optimizer, args, train_loader, device)
         val_loss = eval_epoch(model, args, val_loader, device)
         print(f"Epoch {epoch} train loss: {train_loss}, val loss: {val_loss}")
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            if not os.path.exists("checkpoints"):
+                os.makedirs("checkpoints")
+            torch.save(model.state_dict(), f"checkpoints/best_turn_classifier_{datetime_str}.pt")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--bs", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--train", action="store_true")
+    parser.add_argument("--checkpoint", type=str, default=None)
     args = parser.parse_args()
 
     train_loader = DataLoader(MGDataset(frames_per_item=2), batch_size=args.bs, shuffle=True)
@@ -67,6 +80,18 @@ if __name__ == "__main__":
     model.to(device)
     print(model)
     # x = np.random.randint(0, 256, (args.bs, 2, 224, 224, 3))
-    train(model, args, train_loader, val_loader, device)
-    # res = model(x)
-    # print(res)
+    if args.train:
+        train(model, args, train_loader, val_loader, device)
+    else:
+        model.load_state_dict(torch.load(args.checkpoint))
+        model.eval()
+
+        # visualizing image and output
+        with torch.no_grad():
+            for batch, labels in train_loader:
+                batch = batch.to(device)
+                labels = labels.to(device)
+                output = model(batch)
+
+                # visualizing the 0th image
+                viz_mg_data((batch[0], labels[0]), model)
