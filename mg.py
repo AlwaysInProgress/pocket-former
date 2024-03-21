@@ -1,7 +1,7 @@
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
@@ -29,6 +29,7 @@ class MG:
     # each entry is a frame number of when the cube starts moving or stops moving
     # even = start moving, odd = stop moving
     action_frames: List[int] = field(default_factory=list)
+    is_test: bool = False
 
     def is_cube_moving(self, frame_num: int):
         is_moving = False
@@ -218,8 +219,9 @@ class MGDatapoint(Dataset):
             cv2.destroyAllWindows()
 
 class MGDataset(Dataset):
-    def __init__(self, frames_per_item: int = 3):
+    def __init__(self, frames_per_item: int = 3, split = Literal['train', 'test']):
         self.frames_per_item = frames_per_item
+        self.split = split
         pass
 
     def __len__(self):
@@ -230,6 +232,12 @@ class MGDataset(Dataset):
         return item_count
 
     def __getitem__(self, idx: int):
+        dp = self.get_data_point(idx)
+        if dp is None:
+            raise IndexError
+        return (dp.frames, dp.is_moving)
+
+    def get_data_point(self, idx: int):
         mgs = self.get_all_mgs()
         for mg in mgs:
             frame_count = mg.get_frame_count()
@@ -240,6 +248,7 @@ class MGDataset(Dataset):
                 is_moving_label = mg.is_cube_moving(idx)
                 return MGDatapoint(frames, is_moving_label)
             idx -= frame_count - (self.frames_per_item - 1)
+
 
     def download_all(self, amount: int = 100):
         solves = []
