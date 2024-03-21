@@ -235,8 +235,9 @@ class MgDatapoint(Dataset):
                 raise IndexError
             frames.append(frame)
         is_moving = self.mg.is_cube_moving(self.starting_frame)
-        return (frames, is_moving)
-
+        # return (frames, is_moving)
+        return torch.stack(frames), int(is_moving)
+        
     def view(self):
         (frames, is_moving) = self.load_item()
         print(frames[0].shape)
