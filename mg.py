@@ -114,7 +114,6 @@ class MG:
             cv2.imwrite(frame_path, frame)
             frame_num += 1
 
-
     def get_video(self):
         path = mg_dir_path(self.id) + 'video.mp4'
 
@@ -204,8 +203,24 @@ def download_one_by_id(id: int):
     return solve
 
 
+
+@dataclass
+class MGDatapoint(Dataset):
+    frames: List[torch.Tensor]
+    is_moving: bool
+
+    def view(self):
+        print('Is moving:', self.is_moving)
+        for frame in self.frames:
+            img_np = frame.numpy()
+            cv2.imshow('frame', img_np)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+
+
 class MGDataset(Dataset):
-    def __init__(self, frames_per_item: int):
+    def __init__(self, frames_per_item: int = 3):
         self.frames_per_item = frames_per_item
         pass
 
@@ -225,7 +240,7 @@ class MGDataset(Dataset):
                 for i in range(self.frames_per_item):
                     frames.append(mg.get_frame(idx + i))
                 is_moving_label = mg.is_cube_moving(idx)
-                return (frames, is_moving_label)
+                return MGDatapoint(frames, is_moving_label)
             idx -= frame_count - (self.frames_per_item - 1)
 
     def download_all(self, amount: int = 100):
@@ -300,7 +315,6 @@ class MGDataset(Dataset):
 
         return all_mgs
 
-
     def get_by_index(self, idx: int):
         solves = os.listdir(mg_path)
 
@@ -324,6 +338,14 @@ if __name__ == "__main__":
 
     elif action == "download_videos":
         dataset.download_all_videos()
+
+    elif action == "get_item":
+        idx = int(sys.argv[2])
+        item = dataset.__getitem__(idx)
+        if item is not None:
+            item.view()
+        else:
+            print("Item not found")
 
     elif action == "mg":
         solve_id = int(sys.argv[2])
