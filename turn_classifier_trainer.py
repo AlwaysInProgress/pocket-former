@@ -4,6 +4,8 @@ import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 import argparse
+from mg import MGDataset
+from torch.utils.data import DataLoader
 
 def train_epoch(model, optimizer, args, train_loader, device):
     model.train()
@@ -54,8 +56,11 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10)
     args = parser.parse_args()
 
-    train_loader = None # TODO: make this
-    val_loader = None # TODO: make this
+    # train_loader = None # TODO: make this
+    # val_loader = None # TODO: make this
+    train_loader = DataLoader(MGDataset(frames_per_item=2), batch_size=args.bs, shuffle=True)
+    val_loader = DataLoader(MGDataset(frames_per_item=2), batch_size=args.bs, shuffle=True)
+
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = TurnClassifier(hidden_dim=1024, num_classes=2, enc_name="vit-base", num_frames=2).to(device)
