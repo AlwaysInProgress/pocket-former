@@ -1,4 +1,5 @@
 import tkinter as tk
+from typing import Literal
 import cv2
 import mg
 
@@ -55,28 +56,37 @@ class VideoPlayer:
         self.is_test_label.grid(row=0, column=1)
         is_test_frame.pack()
 
-        self.label_button = tk.Button(
-            window,
-            text="Label is Moving", 
-            command=self.label
-        )
-        self.label_button.pack()
-
-        self.remove_label_button = tk.Button(
-            window,
-            text="Remove Last Label", 
-            command=self.remove_label
-        )
-        self.remove_label_button.pack()
-
-        self.is_moving_label = tk.Label(window, text="Is Moving: ")
-        self.is_moving_label.pack()
+        self.canvas = tk.Canvas(window, width=640, height=480)
+        self.canvas.pack()
 
         self.labeled_frames_label = tk.Label(window, text="Label Frames: ")
         self.labeled_frames_label.pack()
 
-        self.canvas = tk.Canvas(window, width=640, height=480)
-        self.canvas.pack()
+        label_frame = tk.Frame(window)
+        self.label_label = tk.Label(label_frame, text="Label:")
+        self.label_label.grid(row=0, column=0)
+        tk.Button(
+            label_frame,
+            text="Add 'MOVING' label",
+            command=lambda: self.label("moving")
+        ).grid(row=0, column=1)
+        tk.Button(
+            label_frame,
+            text="Add 'NOT MOVING' label",
+            command=lambda: self.label("not_moving")
+        ).grid(row=1, column=1)
+        tk.Button(
+            label_frame,
+            text="Add 'INSPECTION' label",
+            command=lambda: self.label("inspection")
+        ).grid(row=2, column=1)
+        tk.Button(
+            label_frame,
+            text="Remove last label", 
+            command=self.remove_label
+        ).grid(row=3, column=1)
+        label_frame.pack()
+
 
         seek_frame = tk.Frame(window)
         tk.Button(
@@ -144,8 +154,8 @@ class VideoPlayer:
         self.window.after(5, self.loop)
 
     def draw(self):
-        is_moving = self.mg.is_cube_moving(self.frame_number)
-        self.is_moving_label.config(text="Is Moving: " + str(is_moving))
+        label = self.mg.get_frame_label(self.frame_number)
+        self.label_label.config(text="Label: " + str(label))
 
         labeled_frames = ','.join([str(frame) for frame in self.mg.action_frames])
         self.labeled_frames_label.config(text="Label Frames: " + labeled_frames)
@@ -154,11 +164,6 @@ class VideoPlayer:
         self.slider.set(self.frame_number)
 
         self.is_test_label.config(text="Is Test: " + str(self.mg.is_test))
-
-        if is_moving:
-            self.label_button.config(text="Add label: not moving")
-        else:
-            self.label_button.config(text="Add label: moving")
 
         if not self.cap or not self.cap.isOpened():
             print("No video loaded")
@@ -200,9 +205,9 @@ class VideoPlayer:
         self.mg.save_to_fs()
         self.draw()
 
-    def label(self):
-        print("Label")
-        self.mg.new_action(self.frame_number)
+    def label(self, label: Literal["moving", "not_moving", "inspection"]):
+        print("Label:", label)
+        self.mg.add_label(self.frame_number, label)
         self.mg.save_to_fs()
         self.draw()
 

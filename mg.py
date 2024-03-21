@@ -41,19 +41,11 @@ class MG:
     moves: List[str] # list of notation moves
     # each entry is a frame number of when the cube starts moving or stops moving
     # even = start moving, odd = stop moving
-    action_frames: List[int] = field(default_factory=list)
+    action_frames: List[Tuple[int, Literal['moving', 'not_moving', 'inspection']]] = field(default_factory=list)
     is_test: bool = False
 
-    def is_cube_moving(self, frame_num: int):
-        is_moving = False
-        for frame in self.action_frames:
-            if frame_num < frame:
-                break
-            is_moving = not is_moving
-        return is_moving
-
-    def new_action(self, frame_num: int):
-        self.action_frames.append(frame_num)
+    def add_label(self, frame_num: int, label: Literal['moving', 'not_moving', 'inspection']):
+        self.action_frames.append((frame_num, label))
 
     def remove_last_action(self):
         self.action_frames.pop()
@@ -174,15 +166,12 @@ class MG:
     def get_frame_label(self, frame_num: int) -> Literal["moving", "not_moving", "inspection", "unlabeled"]:
         if len(self.action_frames) == 0:
             return "unlabeled"
-        is_moving = False
-        for frame in self.action_frames:
-            if frame_num < frame:
-                break
-            is_moving = not is_moving
-        if is_moving:
-            return "moving"
-        else:
-            return "not_moving"
+        prev_label = "unlabeled"
+        for (frame_num_inner, label) in self.action_frames:
+            if frame_num < frame_num_inner:
+                return prev_label
+            prev_label = label
+        return prev_label
 
     def get_frame(self, frame_num: int) -> Optional[torch.Tensor]:
         if frame_num >= self.get_frame_count():
@@ -292,6 +281,7 @@ class MgDatapoint(Dataset):
 
         print('Is moving:', is_moving)
         for frame in frames:
+            # img_np = frame.numpy()
             # undoing preprocessing by permuting, converting to numpy, and converting to 0-255
             img_np = (frame.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
             cv2.imshow('frame', img_np)
@@ -386,7 +376,7 @@ class MGDataset(Dataset):
 
     def get_all_mgs(self):
         mgs = os.listdir(mg_path)
-        all_mgs = []
+        all_mgs: List[MG] = []
 
         for mg in mgs:
             mg = MG.get_from_fs(int(mg))
