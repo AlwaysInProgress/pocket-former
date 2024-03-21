@@ -239,9 +239,13 @@ class MgDatapoint(Dataset):
 
     def view(self):
         (frames, is_moving) = self.load_item()
+        print(frames[0].shape)
+
         print('Is moving:', is_moving)
         for frame in frames:
-            img_np = frame.numpy()
+            # img_np = frame.numpy()
+            # undoing preprocessing by permuting, converting to numpy, and converting to 0-255
+            img_np = (frame.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
             cv2.imshow('frame', img_np)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
