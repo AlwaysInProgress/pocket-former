@@ -9,6 +9,7 @@ import json
 import cv2
 from pytube import YouTube
 from torch.utils.data import Dataset
+import torch
 
 mg_path = 'data/mg/'
 
@@ -129,6 +130,17 @@ class MG:
     def get_frame_count(self):
         return len(os.listdir(mg_dir_path(self.id) + 'frames/'))
 
+    def get_frame(self, frame_num: int) -> Optional[torch.Tensor]:
+        if frame_num >= self.get_frame_count():
+            print('Frame not found')
+            return None
+        path = mg_dir_path(self.id) + 'frames/' + str(frame_num) + '.jpg'
+        img = cv2.imread(path)
+        # convert img to tensor
+        img_tensor = torch.from_numpy(img)
+        return img_tensor
+
+
 def download_one_by_id(id: int):
     url = "https://reco.nz/solve/" + str(id)
     response = requests.get(url)
@@ -193,15 +205,28 @@ def download_one_by_id(id: int):
 
 
 class MGDataset(Dataset):
-    def __init__(self):
+    def __init__(self, frames_per_item: int):
+        self.frames_per_item = frames_per_item
         pass
 
     def __len__(self):
         mgs = self.get_all_mgs()
         item_count = 0
         for mg in mgs:
-            item_count += mg.get_frame_count() - 2
+            item_count += mg.get_frame_count() - (self.frames_per_item - 1)
         return item_count
+
+    def __getitem__(self, idx: int):
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            frame_count = mg.get_frame_count()
+            if idx < frame_count - (self.frames_per_item - 1):
+                frames: List[torch.Tensor] = []
+                for i in range(self.frames_per_item):
+                    frames.append(mg.get_frame(idx + i))
+                is_moving_label = mg.is_cube_moving(idx)
+                return (frames, is_moving_label)
+            idx -= frame_count - (self.frames_per_item - 1)
 
     def download_all(self, amount: int = 100):
         solves = []
