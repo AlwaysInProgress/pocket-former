@@ -45,6 +45,16 @@ class VideoPlayer:
             command=self.prev_video
         ).pack()
 
+        is_test_frame = tk.Frame(window)
+        tk.Button(
+            is_test_frame,
+            text="Toggle is_test",
+            command=self.toggle_is_test
+        ).grid(row=0, column=0)
+        self.is_test_label = tk.Label(is_test_frame, text="Is Test: ")
+        self.is_test_label.grid(row=0, column=1)
+        is_test_frame.pack()
+
         self.label_button = tk.Button(
             window,
             text="Label is Moving", 
@@ -124,7 +134,6 @@ class VideoPlayer:
         self.max_frame: int = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.draw()
 
-
     def loop(self):
         if self.playingState == "fast_forwards":
             self.forward(10)
@@ -144,6 +153,7 @@ class VideoPlayer:
         self.slider.config(to=self.max_frame)
         self.slider.set(self.frame_number)
 
+        self.is_test_label.config(text="Is Test: " + str(self.mg.is_test))
 
         if is_moving:
             self.label_button.config(text="Add label: not moving")
@@ -184,6 +194,11 @@ class VideoPlayer:
         if self.mg_index < 0:
             self.mg_index = self.mgdataset.get_count() - 1
         self.load_mg()
+
+    def toggle_is_test(self):
+        self.mg.is_test = not self.mg.is_test
+        self.mg.save_to_fs()
+        self.draw()
 
     def label(self):
         print("Label")
