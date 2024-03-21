@@ -12,7 +12,7 @@ class VideoPlayer:
         self.frame_number = 0
         self.playingState = "paused"
         self.mgdataset = mg.MGDataset()
-        self.mg_index = 0
+        self.mg_index = 1
 
         tk.Button(
             window,
@@ -98,10 +98,12 @@ class VideoPlayer:
     def load_mg(self):
         idx = self.mg_index
         mg = self.mgdataset.get_by_index(idx)
+        print("Loading mg", idx)
         if mg is None:
-            print("No mg found")
+            print("No mg found for index", idx)
             return
         self.mg = mg
+        mg.print()
         self.cap = self.mg.get_video()
         self.max_frame: int = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.draw()

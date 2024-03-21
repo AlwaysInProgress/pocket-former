@@ -67,7 +67,7 @@ class MG:
             data = f.read()
             mg = MG(**json.loads(data))
 
-        annotations_path = mg_annotations_path(id)
+        annotations_path = mg_annotations_path(mg.web_id)
         if not os.path.exists(annotations_path):
             return mg
         with open(annotations_path, 'r') as f:
@@ -75,6 +75,8 @@ class MG:
             annotations = json.loads(data)
             mg.action_frames = annotations["action_frames"]
             mg.is_test = annotations["is_test"]
+
+        return mg
 
     def save_to_fs(self):
         print('Saving to fs: ', self.id)
@@ -387,15 +389,18 @@ class MGDataset(Dataset):
         return all_mgs
 
     def get_by_index(self, idx: int):
-        solves = os.listdir(mg_path)
+        mgs = self.get_all_mgs()
+        print('Mgs found:', len(mgs))
+        if idx > len(mgs):
+            print('MG Index out of bounds')
+            raise IndexError
 
-        if idx >= len(solves):
-            print('Index out of range')
-            return None
+        print('Returning mg', idx)
+        for mg in mgs:
+            mg.print()
 
-        solveId = int(solves[idx])
-
-        return MG.get_from_fs(solveId)
+        mg = mgs[idx]
+        return mg
 
 
 if __name__ == "__main__":
