@@ -165,8 +165,11 @@ class MG:
         frame_path = mg_dir_path(self.id) + 'frames/'
         if not os.path.exists(frame_path):
             return 0
-        return len(frame_path)
-    
+
+        num_frames = len(os.listdir(frame_path))
+
+        return num_frames
+
     def center_crop(self, img: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
         h, w = img.shape[:2]
         x1 = (w - size[0]) // 2
