@@ -129,7 +129,10 @@ class MG:
         return cap
 
     def get_frame_count(self):
-        return len(os.listdir(mg_dir_path(self.id) + 'frames/'))
+        frame_path = mg_dir_path(self.id) + 'frames/'
+        if not os.path.exists(frame_path):
+            return 0
+        return len(frame_path)
     
     def center_crop(self, img: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
         h, w = img.shape[:2]
@@ -179,7 +182,6 @@ def download_one_by_id(id: int):
         print("Multiple iframes found")
         return
 
-
     # map to list of hrefs
     urls: List[str] = list(map(lambda a: a.get("href"), soup.find_all('a')))
     # filter out urls with cubedb
@@ -218,50 +220,56 @@ def download_one_by_id(id: int):
     return solve
 
 
-
 @dataclass
-class MGDatapoint(Dataset):
-    frames: List[torch.Tensor]
-    is_moving: bool
+class MgDatapoint(Dataset):
+    mg: MG
+    starting_frame: int
+    num_frames: int
+
+    def load_item(self):
+        frames: List[torch.Tensor] = []
+        for i in range(self.num_frames):
+            frame = self.mg.get_frame(self.starting_frame + i)
+            if frame is None:
+                print('Frame not found')
+                raise IndexError
+            frames.append(frame)
+        is_moving = self.mg.is_cube_moving(self.starting_frame)
+        return (frames, is_moving)
 
     def view(self):
-        print('Is moving:', self.is_moving)
-        for frame in self.frames:
+        (frames, is_moving) = self.load_item()
+        print('Is moving:', is_moving)
+        for frame in frames:
             img_np = frame.numpy()
             cv2.imshow('frame', img_np)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
+
 class MGDataset(Dataset):
     def __init__(self, frames_per_item: int = 3, split: Literal['train', 'test', 'both'] = 'both'):
         self.frames_per_item = frames_per_item
         self.split = split
-        pass
+        
+        self.dps = []
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            for i in range(mg.get_frame_count() - (self.frames_per_item - 1)):
+                dp = MgDatapoint(mg=mg, starting_frame=i, num_frames=self.frames_per_item)
+                self.dps.append(dp)
+
 
     def __len__(self):
-        mgs = self.get_all_mgs()
-        item_count = 0
-        for mg in mgs:
-            item_count += mg.get_frame_count() - (self.frames_per_item - 1)
-        return item_count
+        return len(self.dps)
 
     def __getitem__(self, idx: int):
         dp = self.get_data_point(idx)
-        if dp is None:
-            raise IndexError
-        return (dp.frames, dp.is_moving)
+        return dp.load_item()
 
     def get_data_point(self, idx: int):
-        mgs = self.get_all_mgs()
-        for mg in mgs:
-            frame_count = mg.get_frame_count()
-            if idx < frame_count - (self.frames_per_item - 1):
-                frames: List[torch.Tensor] = []
-                for i in range(self.frames_per_item):
-                    frames.append(mg.get_frame(idx + i))
-                is_moving_label = mg.is_cube_moving(idx)
-                return MGDatapoint(frames, is_moving_label)
-            idx -= frame_count - (self.frames_per_item - 1)
+        return self.dps[idx]
+
 
     def download_all(self, amount: int = 100):
         solves = []
