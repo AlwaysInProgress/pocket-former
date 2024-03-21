@@ -256,7 +256,7 @@ class MGDataset(Dataset):
         self.frames_per_item = frames_per_item
         self.split = split
         
-        self.dps = []
+        self.dps: List[MgDatapoint] = []
         mgs = self.get_all_mgs()
         for mg in mgs:
             for i in range(mg.get_frame_count() - (self.frames_per_item - 1)):
