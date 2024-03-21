@@ -8,6 +8,8 @@ from urllib.parse import urlparse, parse_qs
 import json
 import cv2
 from pytube import YouTube
+from torch.utils.data import Dataset
+import torch
 
 mg_path = 'data/mg/'
 
@@ -125,6 +127,20 @@ class MG:
         cap = cv2.VideoCapture(path)
         return cap
 
+    def get_frame_count(self):
+        return len(os.listdir(mg_dir_path(self.id) + 'frames/'))
+
+    def get_frame(self, frame_num: int) -> Optional[torch.Tensor]:
+        if frame_num >= self.get_frame_count():
+            print('Frame not found')
+            return None
+        path = mg_dir_path(self.id) + 'frames/' + str(frame_num) + '.jpg'
+        img = cv2.imread(path)
+        # convert img to tensor
+        img_tensor = torch.from_numpy(img)
+        return img_tensor
+
+
 def download_one_by_id(id: int):
     url = "https://reco.nz/solve/" + str(id)
     response = requests.get(url)
@@ -188,7 +204,30 @@ def download_one_by_id(id: int):
     return solve
 
 
-class MGDataset:
+class MGDataset(Dataset):
+    def __init__(self, frames_per_item: int):
+        self.frames_per_item = frames_per_item
+        pass
+
+    def __len__(self):
+        mgs = self.get_all_mgs()
+        item_count = 0
+        for mg in mgs:
+            item_count += mg.get_frame_count() - (self.frames_per_item - 1)
+        return item_count
+
+    def __getitem__(self, idx: int):
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            frame_count = mg.get_frame_count()
+            if idx < frame_count - (self.frames_per_item - 1):
+                frames: List[torch.Tensor] = []
+                for i in range(self.frames_per_item):
+                    frames.append(mg.get_frame(idx + i))
+                is_moving_label = mg.is_cube_moving(idx)
+                return (frames, is_moving_label)
+            idx -= frame_count - (self.frames_per_item - 1)
+
     def download_all(self, amount: int = 100):
         solves = []
         for i in range(1, amount + 1):
@@ -238,14 +277,29 @@ class MGDataset:
         return merged_solves
 
     def download_all_videos(self):
-        solves = os.listdir(mg_path)
-        for solve in solves:
-            solve = MG.get_from_fs(int(solve))
-            if solve is not None:
-                solve.download_video()
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            mg.download_video()
+
+    def process_all_frames(self):
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            mg.process_frames()
 
     def get_count(self):
         return len(os.listdir(mg_path))
+
+    def get_all_mgs(self):
+        mgs = os.listdir(mg_path)
+        all_mgs = []
+
+        for mg in mgs:
+            mg = MG.get_from_fs(int(mg))
+            if mg is not None:
+                all_mgs.append(mg)
+
+        return all_mgs
+
 
     def get_by_index(self, idx: int):
         solves = os.listdir(mg_path)
