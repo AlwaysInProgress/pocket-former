@@ -95,7 +95,8 @@ class VisionEncoder(nn.Module):
 
 
         if self.preprocess is None:
-            self.preprocess = self.preprocess_numpy
+            # self.preprocess = self.preprocess_numpy
+            self.preprocess = lambda x: x
 
         self.model.to(device)
         self.model.eval()
