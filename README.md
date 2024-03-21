@@ -49,6 +49,16 @@ Download and preprocess the first 20 move groups:
 python mg.py download 20
 ```
 
+Then download all the videos 
+```bash
+python mg.py download_videos
+```
+
+Then process all the frames
+```bash
+python mg.py process
+```
+
 View info for mg with id 0:
 ```bash
 python mg.py mg 0 print
@@ -56,7 +66,7 @@ python mg.py mg 0 print
 
 Download a video for mg with id 0:
 ```bash
-python mg.py mg 0 download
+python mg.py mg 0 video
 ```
 
 Process all the frames for mg with id 0:

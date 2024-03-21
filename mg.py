@@ -217,8 +217,6 @@ class MGDatapoint(Dataset):
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-
-
 class MGDataset(Dataset):
     def __init__(self, frames_per_item: int = 3):
         self.frames_per_item = frames_per_item
@@ -339,6 +337,9 @@ if __name__ == "__main__":
     elif action == "download_videos":
         dataset.download_all_videos()
 
+    elif action == "process_frames":
+        dataset.process_all_frames()
+
     elif action == "get_item":
         idx = int(sys.argv[2])
         item = dataset.__getitem__(idx)
@@ -356,7 +357,7 @@ if __name__ == "__main__":
             exit()
 
         action = sys.argv[3]
-        if action == "download":
+        if action == "video":
             solve.download_video()
         elif action == "process":
             solve.process_frames()
