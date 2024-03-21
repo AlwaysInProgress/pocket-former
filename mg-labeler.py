@@ -14,17 +14,6 @@ class VideoPlayer:
         self.mgdataset = mg.MGDataset()
         self.mg_index = 1
 
-        tk.Button(
-            window,
-            text="Next Frame", 
-            command=self.forward
-        ).pack()
-
-        tk.Button(
-            window,
-            text="Prev Frame", 
-            command=self.backwards
-        ).pack()
 
         tk.Button(
             window,
@@ -78,6 +67,33 @@ class VideoPlayer:
 
         self.canvas = tk.Canvas(window, width=640, height=480)
         self.canvas.pack()
+
+        seek_frame = tk.Frame(window)
+        tk.Button(
+            seek_frame,
+            text="Next Frame", 
+            command=self.forward
+        ).grid(row=0, column=1)
+        tk.Button(
+            seek_frame,
+            text="Prev Frame", 
+            command=self.backwards
+        ).grid(row=0, column=0)
+        seek_frame.pack()
+
+        seek_5_frame = tk.Frame(window)
+        tk.Button(
+            seek_5_frame,
+            text="Next 5 Frame", 
+            command=lambda: self.forward(5)
+        ).grid(row=0, column=1)
+        tk.Button(
+            seek_5_frame,
+            text="Prev 5 Frame", 
+            command=lambda: self.backwards(5)
+        ).grid(row=0, column=0)
+        seek_5_frame.pack()
+
 
         self.slider = tk.Scale(
             window, 
@@ -156,12 +172,14 @@ class VideoPlayer:
         self.canvas.pack()
 
     def next_video(self):
+        self.frame_number = 0
         self.mg_index += 1
         if self.mg_index >= self.mgdataset.get_count():
             self.mg_index = 0
         self.load_mg()
 
     def prev_video(self):
+        self.frame_number = 0
         self.mg_index -= 1
         if self.mg_index < 0:
             self.mg_index = self.mgdataset.get_count() - 1
