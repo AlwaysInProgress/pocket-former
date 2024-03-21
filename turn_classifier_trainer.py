@@ -72,14 +72,14 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str, default=None)
     args = parser.parse_args()
 
-    train_loader = DataLoader(MGDataset(frames_per_item=2), batch_size=args.bs, shuffle=True)
-    val_loader = DataLoader(MGDataset(frames_per_item=2), batch_size=args.bs, shuffle=True)
+    train_loader = DataLoader(MGDataset(frames_per_item=2, split='train'), batch_size=args.bs, shuffle=True)
+    val_loader = DataLoader(MGDataset(frames_per_item=2, split='test'), batch_size=args.bs, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = TurnClassifier(hidden_dim=1024, num_classes=2, enc_name="vit-base", num_frames=2)
     model.to(device)
     print(model)
-    # x = np.random.randint(0, 256, (args.bs, 2, 224, 224, 3))
+
     if args.train:
         train(model, args, train_loader, val_loader, device)
     else:
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
         # visualizing image and output
         with torch.no_grad():
-            for batch, labels in train_loader:
+            for batch, labels in val_loader:
                 batch = batch.to(device)
                 labels = labels.to(device)
                 output = model(batch)
