@@ -233,7 +233,7 @@ class MGDatapoint(Dataset):
             cv2.destroyAllWindows()
 
 class MGDataset(Dataset):
-    def __init__(self, frames_per_item: int = 3, split = Literal['train', 'test']):
+    def __init__(self, frames_per_item: int = 3, split: Literal['train', 'test', 'both'] = 'both'):
         self.frames_per_item = frames_per_item
         self.split = split
         pass
@@ -262,7 +262,6 @@ class MGDataset(Dataset):
                 is_moving_label = mg.is_cube_moving(idx)
                 return MGDatapoint(frames, is_moving_label)
             idx -= frame_count - (self.frames_per_item - 1)
-
 
     def download_all(self, amount: int = 100):
         solves = []
@@ -331,8 +330,17 @@ class MGDataset(Dataset):
 
         for mg in mgs:
             mg = MG.get_from_fs(int(mg))
-            if mg is not None:
-                all_mgs.append(mg)
+
+            if mg is None:
+                continue
+
+            if self.split == 'test' and not mg.is_test:
+                continue
+
+            if self.split == 'train' and mg.is_test:
+                continue
+
+            all_mgs.append(mg)
 
         return all_mgs
 
@@ -365,7 +373,7 @@ if __name__ == "__main__":
 
     elif action == "get_item":
         idx = int(sys.argv[2])
-        item = dataset.__getitem__(idx)
+        item = dataset.get_data_point(idx)
         if item is not None:
             item.view()
         else:
