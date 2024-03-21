@@ -10,6 +10,7 @@ import cv2
 from pytube import YouTube
 from torch.utils.data import Dataset
 import torch
+import numpy as np
 
 mg_path = 'data/mg/'
 
@@ -129,6 +130,14 @@ class MG:
 
     def get_frame_count(self):
         return len(os.listdir(mg_dir_path(self.id) + 'frames/'))
+    
+    def center_crop(self, img: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
+        h, w = img.shape[:2]
+        x1 = (w - size[0]) // 2
+        y1 = (h - size[1]) // 2
+        x2 = x1 + size[0]
+        y2 = y1 + size[1]
+        return img[y1:y2, x1:x2]
 
     def get_frame(self, frame_num: int) -> Optional[torch.Tensor]:
         if frame_num >= self.get_frame_count():
@@ -136,8 +145,13 @@ class MG:
             return None
         path = mg_dir_path(self.id) + 'frames/' + str(frame_num) + '.jpg'
         img = cv2.imread(path)
-        # convert img to tensor
+        img = self.center_crop(img, (224, 224))
+
+        # preprocess image
         img_tensor = torch.from_numpy(img)
+        img_tensor = img_tensor.permute(2, 0, 1).float() / 255.0
+        print("img_tensor.shape", img_tensor.shape)
+        print("img_tensor max", img_tensor.max())
         return img_tensor
 
 
