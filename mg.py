@@ -178,6 +178,19 @@ class MG:
         y2 = y1 + size[1]
         return img[y1:y2, x1:x2]
 
+    def get_frame_label(self, frame_num: int) -> Literal["moving", "not_moving", "inspection", "unlabeled"]:
+        if len(self.action_frames) == 0:
+            return "unlabeled"
+        is_moving = False
+        for frame in self.action_frames:
+            if frame_num < frame:
+                break
+            is_moving = not is_moving
+        if is_moving:
+            return "moving"
+        else:
+            return "not_moving"
+
     def get_frame(self, frame_num: int) -> Optional[torch.Tensor]:
         if frame_num >= self.get_frame_count():
             print('Frame not found')
@@ -268,9 +281,8 @@ class MgDatapoint(Dataset):
                 print('Frame not found')
                 raise IndexError
             frames.append(frame)
-        is_moving = self.mg.is_cube_moving(self.starting_frame)
-        # return (frames, is_moving)
-        return torch.stack(frames), int(is_moving)
+        label = self.mg.get_frame_label(self.starting_frame)
+        return torch.stack(frames), label
         
     def view(self, checkpoint=None):
         (frames, is_moving) = self.load_item()
@@ -286,7 +298,6 @@ class MgDatapoint(Dataset):
 
         print('Is moving:', is_moving)
         for frame in frames:
-            # img_np = frame.numpy()
             # undoing preprocessing by permuting, converting to numpy, and converting to 0-255
             img_np = (frame.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
             cv2.imshow('frame', img_np)
