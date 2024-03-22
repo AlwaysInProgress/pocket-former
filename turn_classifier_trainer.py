@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 import datetime
 from utils import *
 import os
+import cv2
+import numpy as np
 
 def train_epoch(model, optimizer, args, train_loader, device):
     model.train()
@@ -19,6 +21,7 @@ def train_epoch(model, optimizer, args, train_loader, device):
         labels = labels.to(device)
         output = model(batch)
         loss = nn.functional.cross_entropy(output, labels)
+        print("loss: ", loss.item())
         loss.backward()
         optimizer.step()
         loss_sum += loss.item()
@@ -64,6 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--checkpoint", type=str, default=None)
+    parser.add_argument("--live", action="store_true")
     args = parser.parse_args()
 
     # train_dataset = MGDataset(frames_per_item=2, split='train')
@@ -74,7 +78,8 @@ if __name__ == "__main__":
     print("train dataset length: ", len(train_dataset))
     print("val dataset length: ", len(val_dataset))
     train_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.bs, shuffle=True)
+    val_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
+    viz_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=False)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = TurnClassifier(hidden_dim=1024, num_classes=2, enc_name="vit-base", num_frames=2)
@@ -83,13 +88,29 @@ if __name__ == "__main__":
 
     if args.train:
         train(model, args, train_loader, val_loader, device)
+    elif args.live:
+        model.eval()
+        # live inference
+        with torch.no_grad():
+            while True:
+                images = []
+                for i in range(2):
+                    image = cv2.imread("test.jpg")
+                    image = cv2.resize(image, (224, 224))
+                    images.append(image)
+                images = np.array(images)
+                images = images / 255.0
+                images = torch.tensor(images).permute(0, 3, 1, 2).float()
+                images = images.to(device)
+                output = model(images)
+                print("output: ", output)
     else:
         model.load_state_dict(torch.load(args.checkpoint))
         model.eval()
 
         # visualizing image and output
         with torch.no_grad():
-            for batch, labels in train_loader:
+            for batch, labels in viz_loader:
                 batch = batch.to(device)
                 labels = labels.to(device)
                 output = model(batch)
