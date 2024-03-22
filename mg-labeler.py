@@ -2,6 +2,7 @@ import tkinter as tk
 from typing import Literal
 import cv2
 import mg
+import json
 
 class VideoPlayer:
     def __init__(self, window):
@@ -55,6 +56,16 @@ class VideoPlayer:
         self.is_test_label = tk.Label(is_test_frame, text="Is Test: ")
         self.is_test_label.grid(row=0, column=1)
         is_test_frame.pack()
+
+        ignored_framed = tk.Frame(window)
+        tk.Button(
+            ignored_framed,
+            text="Toggle ignored",
+            command=self.toggle_ignored
+        ).grid(row=0, column=0)
+        self.ignored_label = tk.Label(ignored_framed, text="Ignored: ")
+        self.ignored_label.grid(row=0, column=1)
+        ignored_framed.pack()
 
         self.canvas = tk.Canvas(window, width=640, height=480)
         self.canvas.pack()
@@ -130,6 +141,9 @@ class VideoPlayer:
         )
         self.slider.pack()
 
+        self.mg_json = tk.Text(window, height=80, width=50)
+        self.mg_json.pack()
+
         self.window.bind("<Left>", self.backwards)
         self.window.bind("<Right>", self.forward)
 
@@ -168,7 +182,13 @@ class VideoPlayer:
         self.slider.config(to=self.max_frame)
         self.slider.set(self.frame_number)
 
+        self.ignored_label.config(text="Ignored: " + str(self.mg.ignored))
         self.is_test_label.config(text="Is Test: " + str(self.mg.is_test))
+
+        self.mg_json.delete('1.0', tk.END)
+        mgjson = self.mg.__dict__
+        mgjson_str = json.dumps(mgjson, indent=4)
+        self.mg_json.insert(tk.END, mgjson_str)
 
         if not self.cap or not self.cap.isOpened():
             print("No video loaded")
@@ -207,6 +227,11 @@ class VideoPlayer:
 
     def toggle_is_test(self):
         self.mg.is_test = not self.mg.is_test
+        self.mg.save_to_fs()
+        self.draw()
+
+    def toggle_ignored(self):
+        self.mg.ignored = not self.mg.ignored
         self.mg.save_to_fs()
         self.draw()
 
