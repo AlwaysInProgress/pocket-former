@@ -130,6 +130,18 @@ class VideoPlayer:
         ).grid(row=0, column=0)
         seek_5_frame.pack()
 
+        seek_10_frame = tk.Frame(window)
+        tk.Button(
+            seek_10_frame,
+            text="Next 10 Frame", 
+            command=lambda: self.forward(10)
+        ).grid(row=0, column=1)
+        tk.Button(
+            seek_10_frame,
+            text="Prev 10 Frame", 
+            command=lambda: self.backwards(10)
+        ).grid(row=0, column=0)
+        seek_10_frame.pack()
 
         self.slider = tk.Scale(
             window, 
