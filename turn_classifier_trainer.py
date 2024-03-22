@@ -1,14 +1,13 @@
 from turn_classifier import TurnClassifier
 import torch
 import torch.nn as nn
-import numpy as np
 from tqdm import tqdm
 import argparse
 from mg import MGDataset
 from torch.utils.data import DataLoader
 import datetime
-import cv2
 from utils import *
+import os
 
 def train_epoch(model, optimizer, args, train_loader, device):
     model.train()
