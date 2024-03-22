@@ -10,6 +10,7 @@ from utils import *
 import os
 import cv2
 import numpy as np
+from torch.utils.data import RandomSampler
 
 def train_epoch(model, optimizer, args, train_loader, device):
     model.train()
@@ -21,7 +22,6 @@ def train_epoch(model, optimizer, args, train_loader, device):
         labels = labels.to(device)
         output = model(batch)
         loss = nn.functional.cross_entropy(output, labels)
-        print("loss: ", loss.item())
         loss.backward()
         optimizer.step()
         loss_sum += loss.item()
@@ -68,12 +68,12 @@ if __name__ == "__main__":
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--checkpoint", type=str, default=None)
     parser.add_argument("--live", action="store_true")
-    parser.add_argument("--frames_per_item", type=int, default=10)
+    parser.add_argument("--frames_per_item", type=int, default=2)
     args = parser.parse_args()
 
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = TurnClassifier(hidden_dim=1024, num_classes=2, enc_name="vit-base", num_frames=2)
+    model = TurnClassifier(hidden_dim=1024, num_classes=2, enc_name="vit-base", num_frames=args.frames_per_item)
     model.to(device)
     print(model)
 
@@ -83,7 +83,8 @@ if __name__ == "__main__":
         val_dataset = pipeline.get_dataset('test')
         print("train dataset length: ", len(train_dataset))
         print("val dataset length: ", len(val_dataset))
-        train_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
+        train_sampler = RandomSampler(train_dataset, replacement=True, num_samples=int(len(train_dataset) * 0.25))
+        train_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=False, sampler=train_sampler)
         val_loader = DataLoader(val_dataset, batch_size=args.bs, shuffle=True)
         train(model, args, train_loader, val_loader, device)
     elif args.live:

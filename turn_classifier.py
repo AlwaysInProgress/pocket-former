@@ -11,10 +11,10 @@ class TurnClassifier(nn.Module):
         self.num_frames = num_frames
 
         self.encoder = VisionEncoder(enc_name, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), pretrained=True)
-        self.dropout = nn.Dropout(p=0.)
         self.mlp = nn.Sequential(
             nn.Linear(self.encoder.embed_dim * self.num_frames, self.hidden_dim),
             nn.ReLU(),
+            nn.Dropout(p=0.5),
             nn.Linear(self.hidden_dim, self.num_classes)
         )
         self.softmax = nn.Softmax(dim=1)
