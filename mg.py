@@ -63,6 +63,7 @@ class MG:
 
         with open(path, 'r') as f:
             data = f.read()
+            print('Data:', data)
             mg = MG(**json.loads(data))
 
         annotations_path = mg_annotations_path(mg.web_id)
