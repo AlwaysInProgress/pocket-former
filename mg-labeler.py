@@ -82,6 +82,11 @@ class VideoPlayer:
         ).grid(row=2, column=1)
         tk.Button(
             label_frame,
+            text="Add 'INSPECTION' label",
+            command=lambda: self.label("scramble")
+        ).grid(row=3, column=1)
+        tk.Button(
+            label_frame,
             text="Remove last label", 
             command=self.remove_label
         ).grid(row=3, column=1)
@@ -205,7 +210,7 @@ class VideoPlayer:
         self.mg.save_to_fs()
         self.draw()
 
-    def label(self, label: Literal["moving", "not_moving", "inspection"]):
+    def label(self, label: mg.ALL_LABELS):
         print("Label:", label)
         self.mg.add_label(self.frame_number, label)
         self.mg.save_to_fs()

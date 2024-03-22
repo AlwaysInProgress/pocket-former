@@ -31,6 +31,8 @@ def mg_annotations_path(web_id: int):
     path = os.path.join(os.path.dirname(__file__), path)
     return path
 
+ALL_LABELS = Literal['moving', 'not_moving', 'inspection', 'scramble', 'unlabeled']
+
 @dataclass
 class MG:
     id: int # folder index
@@ -39,10 +41,10 @@ class MG:
     moves: List[str] # list of notation moves
     # each entry is a frame number of when the cube starts moving or stops moving
     # even = start moving, odd = stop moving
-    action_frames: List[Tuple[int, Literal['moving', 'not_moving', 'inspection']]] = field(default_factory=list)
+    action_frames: List[Tuple[int, ALL_LABELS]] = field(default_factory=list)
     is_test: bool = False
 
-    def add_label(self, frame_num: int, label: Literal['moving', 'not_moving', 'inspection']):
+    def add_label(self, frame_num: int, label: ALL_LABELS):
         self.action_frames.append((frame_num, label))
 
     def remove_last_action(self):
@@ -156,11 +158,8 @@ class MG:
         frame_path = mg_dir_path(self.id) + 'frames/'
         if not os.path.exists(frame_path):
             return 0
-
-        num_frames = len(os.listdir(frame_path))
-
-        return num_frames
-
+        return len(frame_path)
+    
     def center_crop(self, img: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
         h, w = img.shape[:2]
         x1 = (w - size[0]) // 2
@@ -169,7 +168,7 @@ class MG:
         y2 = y1 + size[1]
         return img[y1:y2, x1:x2]
 
-    def get_frame_label(self, frame_num: int) -> Literal["moving", "not_moving", "inspection", "unlabeled"]:
+    def get_frame_label(self, frame_num: int) -> ALL_LABELS:
         if len(self.action_frames) == 0:
             return "unlabeled"
         prev_label = "unlabeled"

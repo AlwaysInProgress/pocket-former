@@ -1,1 +1,1 @@
-{"id": 157, "action_frames": [], "is_test": false}
+{"id": 157, "action_frames": [[13, "moving"], [27, "not_moving"], [47, "moving"], [118, "not_moving"], [143, "inspection"], [249, "moving"]], "is_test": false}
