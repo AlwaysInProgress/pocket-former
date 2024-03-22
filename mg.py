@@ -194,6 +194,13 @@ class MG:
         img_tensor = img_tensor.permute(2, 0, 1).float() / 255.0
         return img_tensor
 
+    def get_datapoints(self, frames_per_datapoint: int):
+        datapoints = []
+        for i in range(self.get_frame_count() - frames_per_datapoint):
+            dp = MgDatapoint(self, i, frames_per_datapoint)
+            datapoints.append(dp)
+        return datapoints
+
 
 @dataclass
 class MgDatapoint(Dataset):
@@ -241,9 +248,7 @@ class MGDataset(Dataset):
         
         self.dps: List[MgDatapoint] = []
         for mg in mgs:
-            for i in range(mg.get_frame_count() - (self.frames_per_item - 1)):
-                dp = MgDatapoint(mg=mg, starting_frame=i, num_frames=self.frames_per_item)
-                self.dps.append(dp)
+            self.dps.extend(mg.get_datapoints(frames_per_item))
 
     def __len__(self):
         return len(self.dps)
