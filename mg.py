@@ -67,22 +67,20 @@ class MG:
             mg = MG(**json.loads(data))
 
         annotations_path = mg_annotations_path(mg.web_id)
-        if not os.path.exists(annotations_path):
+        if os.path.exists(annotations_path):
+            with open(annotations_path, 'r') as f:
+                data = f.read()
+                annotations = json.loads(data)
+                mg.action_frames = annotations["action_frames"]
+                mg.is_test = annotations["is_test"]
+                if "ignored" in annotations:
+                    mg.ignored = annotations["ignored"]
             return mg
-        with open(annotations_path, 'r') as f:
-            data = f.read()
-            annotations = json.loads(data)
-            mg.action_frames = annotations["action_frames"]
-            mg.is_test = annotations["is_test"]
-            if "ignored" in annotations:
-                mg.ignored = annotations["ignored"]
-
-        return mg
 
     def save_to_fs(self):
         print('Saving to fs: ', self.id)
         with open(mg_dir_path(self.id) + 'data.json', 'w') as f:
-            s = json.dumps(self.__dict__)
+            s = json.dumps(self.__dict__, indent=4)
             f.write(s)
         annotations_path = mg_annotations_path(self.web_id)
         with open(annotations_path, 'w') as f:
@@ -93,7 +91,7 @@ class MG:
                 "is_test": self.is_test,
                 "ignored": self.ignored
             }
-            s = json.dumps(data)
+            s = json.dumps(data, indent=4)
             f.write(s)
     
     def print(self):
@@ -176,7 +174,6 @@ class MG:
             return 0
 
         num_frames = len(os.listdir(frame_path))
-
         return num_frames
 
     def get_frame_label(self, frame_num: int) -> ALL_LABELS:
@@ -189,64 +186,53 @@ class MG:
             prev_label = label
         return prev_label
 
-    def get_frame(self, frame_num: int) -> Optional[torch.Tensor]:
-        if frame_num >= self.get_frame_count():
-            print('Frame not found')
-            return None
-        path = mg_dir_path(self.id) + 'frames/' + str(frame_num) + '.jpg'
-        img = cv2.imread(path)
-
-        # resizing so smallest side is 224
-        if img.shape[0] < img.shape[1]:
-            img = cv2.resize(img, (int(224 * img.shape[1] / img.shape[0]), 224))
-        else:
-            img = cv2.resize(img, (224, int(224 * img.shape[0] / img.shape[1])))
-
-        img = center_crop(img, (224, 224))
-
-        # preprocess image
-        img_tensor = torch.from_numpy(img)
-        img_tensor = img_tensor.permute(2, 0, 1).float() / 255.0
-        return img_tensor
-
     def get_datapoints(self, frames_per_datapoint: int):
+        '''
+            Logic for computing data frames from mgs. Removes data point we don't want
+        '''
+        if self.ignored:
+            return []
         datapoints = []
         for frame_num in range(self.get_frame_count() - frames_per_datapoint):
-            dp = MgDatapoint(self, frame_num, frames_per_datapoint)
-            # if unlabeled, skip
-            if self.get_frame_label(frame_num) in ['unlabeled', 'inspection', 'scramble']:
-                print(f"Skipping frame with label {self.get_frame_label(frame_num)}")
+            label = self.get_frame_label(frame_num)
+            frame_paths = []
+            for i in range(frames_per_datapoint):
+                path = mg_dir_path(self.id) + 'frames/' + str(frame_num + i) + '.jpg'
+                frame_paths.append(path)
+
+            if label in ['unlabeled', 'inspection', 'scramble']:
+                print(f"Skipping frame with label {label}")
                 continue
+
+            dp = MgDatapoint(label, frame_paths)
+
             datapoints.append(dp)
         return datapoints
 
-
 @dataclass
 class MgDatapoint(Dataset):
-    mg: MG
-    starting_frame: int
-    num_frames: int
+    label: ALL_LABELS
+    frames_paths: List[str] = field(default_factory=list)
 
     def load_item(self):
         frames: List[torch.Tensor] = []
-        for i in range(self.num_frames):
-            frame = self.mg.get_frame(self.starting_frame + i)
-            if frame is None:
-                print('Frame not found')
-                raise IndexError
-            frames.append(frame)
-        label = self.mg.get_frame_label(self.starting_frame)
-        all_label_index = get_args(ALL_LABELS).index(label)
-        if label in ['moving']:
-            class_idx = 1
-        elif label in ['not_moving']:
-            class_idx = 0
-        else:
-            raise ValueError
-        return torch.stack(frames), class_idx
+        for frame_path in self.frames_paths:
+            img = cv2.imread(frame_path)
+            img = center_crop(img, (224, 224))
+            # resizing so smallest side is 224
+            if img.shape[0] < img.shape[1]:
+                img = cv2.resize(img, (int(224 * img.shape[1] / img.shape[0]), 224))
+            else:
+                img = cv2.resize(img, (224, int(224 * img.shape[0] / img.shape[1])))
+            img_tensor = torch.from_numpy(img)
+            img_tensor = img_tensor.permute(2, 0, 1).float() / 255.0
+            frames.append(img_tensor)
+
+        all_label_index = get_args(ALL_LABELS).index(self.label)
+        return torch.stack(frames), all_label_index
         
     def view(self, checkpoint=None):
-        (frames, is_moving) = self.load_item()
+        (frames, _) = self.load_item()
         print(frames[0].shape)
 
         if checkpoint is not None:
@@ -258,7 +244,6 @@ class MgDatapoint(Dataset):
                 print('Prediction in view:', pred)
 
         for frame in frames:
-            # img_np = frame.numpy()
             # undoing preprocessing by permuting, converting to numpy, and converting to 0-255
             img_np = (frame.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
             cv2.imshow('frame', img_np)
