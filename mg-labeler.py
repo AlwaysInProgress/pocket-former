@@ -1,5 +1,4 @@
 import tkinter as tk
-from typing import Literal
 import cv2
 import mg
 import json
@@ -13,7 +12,7 @@ class VideoPlayer:
         self.cap = None
         self.frame_number = 0
         self.playingState = "paused"
-        self.mgdataset = mg.MGDataset()
+        self.mgdataset = mg.DataPipeline()
         self.mg_index = 1
 
 

@@ -56,7 +56,7 @@ python mg.py download_videos
 
 Then process all the frames
 ```bash
-python mg.py process
+python mg.py process_frames
 ```
 
 View info for mg with id 0:
