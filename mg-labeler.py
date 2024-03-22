@@ -82,7 +82,7 @@ class VideoPlayer:
         ).grid(row=2, column=1)
         tk.Button(
             label_frame,
-            text="Add 'INSPECTION' label",
+            text="Add 'SCRAMBLE' label",
             command=lambda: self.label("scramble")
         ).grid(row=3, column=1)
         tk.Button(
