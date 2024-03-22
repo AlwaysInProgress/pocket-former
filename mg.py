@@ -45,6 +45,8 @@ class MG:
     # even = start moving, odd = stop moving
     action_frames: List[Tuple[int, ALL_LABELS]] = field(default_factory=list)
     is_test: bool = False
+    # Some videos look bad and we don't want them
+    ignore: bool = False
 
     def add_label(self, frame_num: int, label: ALL_LABELS):
         self.action_frames.append((frame_num, label))
