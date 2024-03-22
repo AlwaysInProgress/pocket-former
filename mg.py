@@ -12,6 +12,7 @@ from torch.utils.data import Dataset
 import torch
 import numpy as np
 from utils import *
+from typing_extensions import get_args
 
 mg_path = 'data/mg/'
 
@@ -171,6 +172,7 @@ class MG:
         if len(self.action_frames) == 0:
             return "unlabeled"
         prev_label = "unlabeled"
+        print('Action frames:', self.action_frames)
         for (frame_num_inner, label) in self.action_frames:
             if frame_num < frame_num_inner:
                 return prev_label
@@ -183,6 +185,13 @@ class MG:
             return None
         path = mg_dir_path(self.id) + 'frames/' + str(frame_num) + '.jpg'
         img = cv2.imread(path)
+
+        # resizing so smallest side is 224
+        if img.shape[0] < img.shape[1]:
+            img = cv2.resize(img, (int(224 * img.shape[1] / img.shape[0]), 224))
+        else:
+            img = cv2.resize(img, (224, int(224 * img.shape[0] / img.shape[1])))
+
         img = center_crop(img, (224, 224))
 
         # preprocess image
@@ -209,7 +218,14 @@ class MgDatapoint(Dataset):
             frames.append(frame)
         label = self.mg.get_frame_label(self.starting_frame)
         print('Label from load_item:', label)
-        return torch.stack(frames), label.index
+        for frame in frames:
+            print('Frame shape:', frame.shape)
+        # returning frames and label (index of ALL_LABELS)
+        # all_label_index = ['moving', 'not_moving', 'inspection', 'scramble', 'unlabeled'].index(label)
+        # all_label_index = list(ALL_LABELS).index(label)
+        all_label_index = get_args(ALL_LABELS).index(label)
+        print('All label index:', all_label_index)
+        return torch.stack(frames), all_label_index
         
     def view(self, checkpoint=None):
         (frames, is_moving) = self.load_item()
@@ -251,6 +267,7 @@ class MGDataset(Dataset):
 
     def __getitem__(self, idx: int):
         dp = self.get_data_point(idx)
+        dp.mg.print()
         return dp.load_item()
 
     def get_data_point(self, idx: int):
