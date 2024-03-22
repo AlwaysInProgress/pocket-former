@@ -74,7 +74,8 @@ class MG:
             annotations = json.loads(data)
             mg.action_frames = annotations["action_frames"]
             mg.is_test = annotations["is_test"]
-            mg.ignored = annotations["ignored"]
+            if "ignored" in annotations:
+                mg.ignored = annotations["ignored"]
 
         return mg
 
@@ -182,7 +183,6 @@ class MG:
         if len(self.action_frames) == 0:
             return "unlabeled"
         prev_label = "unlabeled"
-        print('Action frames:', self.action_frames)
         for (frame_num_inner, label) in self.action_frames:
             if frame_num < frame_num_inner:
                 return prev_label
@@ -211,8 +211,12 @@ class MG:
 
     def get_datapoints(self, frames_per_datapoint: int):
         datapoints = []
-        for i in range(self.get_frame_count() - frames_per_datapoint):
-            dp = MgDatapoint(self, i, frames_per_datapoint)
+        for frame_num in range(self.get_frame_count() - frames_per_datapoint):
+            dp = MgDatapoint(self, frame_num, frames_per_datapoint)
+            # if unlabeled, skip
+            if self.get_frame_label(frame_num) in ['unlabeled', 'inspection', 'scramble']:
+                print(f"Skipping frame with label {self.get_frame_label(frame_num)}")
+                continue
             datapoints.append(dp)
         return datapoints
 
@@ -232,15 +236,14 @@ class MgDatapoint(Dataset):
                 raise IndexError
             frames.append(frame)
         label = self.mg.get_frame_label(self.starting_frame)
-        print('Label from load_item:', label)
-        for frame in frames:
-            print('Frame shape:', frame.shape)
-        # returning frames and label (index of ALL_LABELS)
-        # all_label_index = ['moving', 'not_moving', 'inspection', 'scramble', 'unlabeled'].index(label)
-        # all_label_index = list(ALL_LABELS).index(label)
         all_label_index = get_args(ALL_LABELS).index(label)
-        print('All label index:', all_label_index)
-        return torch.stack(frames), all_label_index
+        if label in ['moving']:
+            class_idx = 1
+        elif label in ['not_moving']:
+            class_idx = 0
+        else:
+            raise ValueError
+        return torch.stack(frames), class_idx
         
     def view(self, checkpoint=None):
         (frames, is_moving) = self.load_item()
@@ -254,7 +257,6 @@ class MgDatapoint(Dataset):
                 pred = model(frames)
                 print('Prediction in view:', pred)
 
-        print('Is moving:', is_moving)
         for frame in frames:
             # img_np = frame.numpy()
             # undoing preprocessing by permuting, converting to numpy, and converting to 0-255
@@ -277,13 +279,15 @@ class MGDataset(Dataset):
 
     def __getitem__(self, idx: int):
         dp = self.get_data_point(idx)
-        dp.mg.print()
         return dp.load_item()
 
     def get_data_point(self, idx: int):
         return self.dps[idx]
 
 class DataPipeline:
+    def __init__(self, frames_per_item: int = 3):
+        self.frames_per_item = frames_per_item
+            
     def download_all_videos(self):
         mgs = self.get_all_mgs()
         for mg in mgs:
@@ -304,7 +308,7 @@ class DataPipeline:
         elif split == 'test':
             mgs = list(filter(lambda mg: mg.is_test, mgs))
 
-        return MGDataset(mgs)
+        return MGDataset(mgs, frames_per_item=self.frames_per_item)
 
     def get_all_mgs(self):
         mgs = os.listdir(mg_path)

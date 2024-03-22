@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 import argparse
-from mg import MGDataset
+from mg import MGDataset, DataPipeline
 from torch.utils.data import DataLoader
 import datetime
 from utils import *
@@ -18,12 +18,7 @@ def train_epoch(model, optimizer, args, train_loader, device):
         batch = batch.to(device)
         labels = labels.to(device)
         output = model(batch)
-        print("batch shape: ", batch.shape)
-        print("output shape: ", output.shape)
-        print("labels shape: ", labels.shape)
-        print("labels: ", labels)
         loss = nn.functional.cross_entropy(output, labels)
-        print("loss: ", loss.item())
         loss.backward()
         optimizer.step()
         loss_sum += loss.item()
@@ -71,12 +66,15 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str, default=None)
     args = parser.parse_args()
 
-    train_dataset = MGDataset(frames_per_item=2, split='train')
-    val_dataset = MGDataset(frames_per_item=2, split='test')
+    # train_dataset = MGDataset(frames_per_item=2, split='train')
+    # val_dataset = MGDataset(frames_per_item=2, split='test')
+    pipeline = DataPipeline(frames_per_item=2)
+    train_dataset = pipeline.get_dataset('train')
+    val_dataset = pipeline.get_dataset('test')
     print("train dataset length: ", len(train_dataset))
     print("val dataset length: ", len(val_dataset))
     train_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
-    val_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.bs, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = TurnClassifier(hidden_dim=1024, num_classes=2, enc_name="vit-base", num_frames=2)

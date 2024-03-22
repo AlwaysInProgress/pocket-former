@@ -153,8 +153,6 @@ class VisionEncoder(nn.Module):
         # plt.imshow(image)
         # plt.show()
 
-        print("preprocessed image shape: ", images.shape)
-
         if "clip" in self.model_name:
             return self.model.encode_image(images)
         elif "voltron" in self.model_name:
