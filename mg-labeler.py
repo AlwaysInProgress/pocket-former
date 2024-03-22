@@ -89,7 +89,7 @@ class VideoPlayer:
             label_frame,
             text="Remove last label", 
             command=self.remove_label
-        ).grid(row=3, column=1)
+        ).grid(row=4, column=1)
         label_frame.pack()
 
 
