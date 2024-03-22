@@ -271,7 +271,7 @@ class MgDatapoint(Dataset):
                 raise IndexError
             frames.append(frame)
         label = self.mg.get_frame_label(self.starting_frame)
-        return torch.stack(frames), label
+        return torch.stack(frames), label.index
         
     def view(self, checkpoint=None):
         (frames, is_moving) = self.load_item()
