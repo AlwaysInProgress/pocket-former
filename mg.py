@@ -74,6 +74,7 @@ class MG:
             annotations = json.loads(data)
             mg.action_frames = annotations["action_frames"]
             mg.is_test = annotations["is_test"]
+            mg.ignored = annotations["ignored"]
 
         return mg
 
@@ -88,7 +89,8 @@ class MG:
             data = {
                 "id": self.web_id,
                 "action_frames": self.action_frames,
-                "is_test": self.is_test
+                "is_test": self.is_test,
+                "ignored": self.ignored
             }
             s = json.dumps(data)
             f.write(s)
@@ -100,7 +102,11 @@ class MG:
         print("Action Frames:", self.action_frames)
         print("Is test:", self.is_test)
 
-    def download_video(self):
+    def download_video(self, skip_if_exists: bool = True):
+        if skip_if_exists and os.path.exists(mg_dir_path(self.id) + 'video.mp4'):
+            print('Video already downloaded, Skipping')
+            return
+
         print('Downloading video')
 
         yt = YouTube(self.url)
@@ -123,15 +129,19 @@ class MG:
 
         print('Video downloaded')
 
-    def process_frames(self):
+    def process_frames(self, skip_if_exists: bool = True):
         '''
         Saves the frames to the data folder
         '''
+        frames_path = mg_dir_path(self.id) + 'frames/'
+
+        if skip_if_exists and os.path.exists(frames_path):
+            print('Frames already processed, Skipping')
+            return
+
         vid = self.get_video()
 
         print('Processing frames')
-
-        frames_path = mg_dir_path(self.id) + 'frames/'
 
         if not os.path.exists(frames_path):
             os.makedirs(frames_path)
@@ -199,7 +209,12 @@ class MG:
         img_tensor = img_tensor.permute(2, 0, 1).float() / 255.0
         return img_tensor
 
-
+    def get_datapoints(self, frames_per_datapoint: int):
+        datapoints = []
+        for i in range(self.get_frame_count() - frames_per_datapoint):
+            dp = MgDatapoint(self, i, frames_per_datapoint)
+            datapoints.append(dp)
+        return datapoints
 
 
 @dataclass
@@ -250,17 +265,12 @@ class MgDatapoint(Dataset):
 
 
 class MGDataset(Dataset):
-    def __init__(self, frames_per_item: int = 3, split: Literal['train', 'test', 'both'] = 'both'):
+    def __init__(self, mgs: List[MG], frames_per_item: int = 3):
         self.frames_per_item = frames_per_item
-        self.split = split
         
         self.dps: List[MgDatapoint] = []
-        mgs = self.get_all_mgs()
         for mg in mgs:
-            for i in range(mg.get_frame_count() - (self.frames_per_item - 1)):
-                dp = MgDatapoint(mg=mg, starting_frame=i, num_frames=self.frames_per_item)
-                self.dps.append(dp)
-
+            self.dps.extend(mg.get_datapoints(frames_per_item))
 
     def __len__(self):
         return len(self.dps)
@@ -272,6 +282,57 @@ class MGDataset(Dataset):
 
     def get_data_point(self, idx: int):
         return self.dps[idx]
+
+class DataPipeline:
+    def download_all_videos(self):
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            mg.download_video()
+
+    def process_all_frames(self):
+        mgs = self.get_all_mgs()
+        for mg in mgs:
+            mg.process_frames()
+
+    def get_count(self):
+        return len(os.listdir(mg_path))
+
+    def get_dataset(self, split: Literal['train', 'test', 'both'] = 'both'):
+        mgs = self.get_all_mgs()
+        if split == 'train':
+            mgs = list(filter(lambda mg: not mg.is_test, mgs))
+        elif split == 'test':
+            mgs = list(filter(lambda mg: mg.is_test, mgs))
+
+        return MGDataset(mgs)
+
+    def get_all_mgs(self):
+        mgs = os.listdir(mg_path)
+        all_mgs: List[MG] = []
+
+        for mg in mgs:
+            mg = MG.get_from_fs(int(mg))
+
+            if mg is None:
+                continue
+
+            all_mgs.append(mg)
+
+        return all_mgs
+
+    def get_by_index(self, idx: int):
+        mgs = self.get_all_mgs()
+        print('Mgs found:', len(mgs))
+        if idx > len(mgs):
+            print('MG Index out of bounds')
+            raise IndexError
+
+        print('Returning mg', idx)
+        for mg in mgs:
+            mg.print()
+
+        mg = mgs[idx]
+        return mg
 
     def download_all(self, amount: int = 100):
         solves = []
@@ -320,53 +381,6 @@ class MGDataset(Dataset):
             solve.save_to_fs()
 
         return merged_solves
-
-    def download_all_videos(self):
-        mgs = self.get_all_mgs()
-        for mg in mgs:
-            mg.download_video()
-
-    def process_all_frames(self):
-        mgs = self.get_all_mgs()
-        for mg in mgs:
-            mg.process_frames()
-
-    def get_count(self):
-        return len(os.listdir(mg_path))
-
-    def get_all_mgs(self):
-        mgs = os.listdir(mg_path)
-        all_mgs: List[MG] = []
-
-        for mg in mgs:
-            mg = MG.get_from_fs(int(mg))
-
-            if mg is None:
-                continue
-
-            if self.split == 'test' and not mg.is_test:
-                continue
-
-            if self.split == 'train' and mg.is_test:
-                continue
-
-            all_mgs.append(mg)
-
-        return all_mgs
-
-    def get_by_index(self, idx: int):
-        mgs = self.get_all_mgs()
-        print('Mgs found:', len(mgs))
-        if idx > len(mgs):
-            print('MG Index out of bounds')
-            raise IndexError
-
-        print('Returning mg', idx)
-        for mg in mgs:
-            mg.print()
-
-        mg = mgs[idx]
-        return mg
 
     def download_by_web_id(self, id: int):
         url = "https://reco.nz/solve/" + str(id)
@@ -430,7 +444,6 @@ class MGDataset(Dataset):
         return solve
 
 
-
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     # parser.add_argument("--bs", type=int, default=32)
@@ -439,23 +452,33 @@ if __name__ == "__main__":
     # parser.add_argument("--checkpoint", type=str, default=None)
     # args = parser.parse_args()
         
-    dataset = MGDataset()
+    pipeline = DataPipeline()
+
+    whole_dataset = pipeline.get_dataset('both')
+    train_dataset = pipeline.get_dataset('train')
+    test_dataset = pipeline.get_dataset('test')
 
     action = sys.argv[1]
 
     if action == "download":
         amount = int(sys.argv[2]) if len(sys.argv) > 2 else 100
-        dataset.download_all(amount)
+        pipeline.download_all(amount)
 
     elif action == "download_videos":
-        dataset.download_all_videos()
+        pipeline.download_all_videos()
 
     elif action == "process_frames":
-        dataset.process_all_frames()
+        pipeline.process_all_frames()
+    
+    elif action == "full_pipeline":
+        amount = int(sys.argv[2]) if len(sys.argv) > 2 else 100
+        pipeline.download_all(amount)
+        pipeline.download_all_videos()
+        pipeline.process_all_frames()
 
     elif action == "get_item":
         idx = int(sys.argv[2])
-        item = dataset.get_data_point(idx)
+        item = whole_dataset.get_data_point(idx)
         if item is not None:
             # if args.checkpoint is not None:
             if len(sys.argv) > 3:
@@ -466,20 +489,20 @@ if __name__ == "__main__":
             print("Item not found")
 
     elif action == "mg":
-        solve_id = int(sys.argv[2])
+        mg_id = int(sys.argv[2])
 
-        solve = MG.get_from_fs(solve_id)
-        if solve is None:
+        mg = MG.get_from_fs(mg_id)
+        if mg is None:
             print("MG not found")
             exit()
 
         action = sys.argv[3]
         if action == "video":
-            solve.download_video()
+            mg.download_video()
         elif action == "process":
-            solve.process_frames()
+            mg.process_frames()
         elif action == "print":
-            solve.print()
+            mg.print()
         else:
             print("No action found")
             exit()
