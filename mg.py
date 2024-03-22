@@ -269,7 +269,7 @@ class MgDatapoint(Dataset):
             frames.append(frame)
         label = self.mg.get_frame_label(self.starting_frame)
         print('Label from load_item:', label)
-        return torch.stack(frames), label
+        return torch.stack(frames), label.index
         
     def view(self, checkpoint=None):
         (frames, is_moving) = self.load_item()
