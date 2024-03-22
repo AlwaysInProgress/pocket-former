@@ -33,6 +33,8 @@ def mg_annotations_path(web_id: int):
     path = os.path.join(os.path.dirname(__file__), path)
     return path
 
+ALL_LABELS = Literal['moving', 'not_moving', 'inspection', 'scramble', 'unlabeled']
+
 @dataclass
 class MG:
     id: int # folder index
@@ -41,10 +43,10 @@ class MG:
     moves: List[str] # list of notation moves
     # each entry is a frame number of when the cube starts moving or stops moving
     # even = start moving, odd = stop moving
-    action_frames: List[Tuple[int, Literal['moving', 'not_moving', 'inspection']]] = field(default_factory=list)
+    action_frames: List[Tuple[int, ALL_LABELS]] = field(default_factory=list)
     is_test: bool = False
 
-    def add_label(self, frame_num: int, label: Literal['moving', 'not_moving', 'inspection']):
+    def add_label(self, frame_num: int, label: ALL_LABELS):
         self.action_frames.append((frame_num, label))
 
     def remove_last_action(self):
