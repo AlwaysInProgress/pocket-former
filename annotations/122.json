@@ -1,1 +1,6 @@
-{"id": 122, "action_frames": [], "is_test": false}
+{
+    "id": 122,
+    "action_frames": [],
+    "is_test": false,
+    "ignored": true
+}
