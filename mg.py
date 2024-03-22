@@ -43,6 +43,8 @@ class MG:
     # even = start moving, odd = stop moving
     action_frames: List[Tuple[int, ALL_LABELS]] = field(default_factory=list)
     is_test: bool = False
+    # Some videos look bad and we don't want them
+    ignore: bool = False
 
     def add_label(self, frame_num: int, label: ALL_LABELS):
         self.action_frames.append((frame_num, label))
@@ -268,9 +270,8 @@ class MgDatapoint(Dataset):
                 print('Frame not found')
                 raise IndexError
             frames.append(frame)
-        is_moving = self.mg.is_cube_moving(self.starting_frame)
-        # return (frames, is_moving)
-        return torch.stack(frames), int(is_moving)
+        label = self.mg.get_frame_label(self.starting_frame)
+        return torch.stack(frames), label
         
     def view(self, checkpoint=None):
         (frames, is_moving) = self.load_item()
