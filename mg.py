@@ -73,6 +73,7 @@ class MG:
             annotations = json.loads(data)
             mg.action_frames = annotations["action_frames"]
             mg.is_test = annotations["is_test"]
+            mg.ignored = annotations["ignored"]
 
         return mg
 
@@ -87,7 +88,8 @@ class MG:
             data = {
                 "id": self.web_id,
                 "action_frames": self.action_frames,
-                "is_test": self.is_test
+                "is_test": self.is_test,
+                "ignored": self.ignored
             }
             s = json.dumps(data)
             f.write(s)
@@ -126,15 +128,19 @@ class MG:
 
         print('Video downloaded')
 
-    def process_frames(self):
+    def process_frames(self, skip_if_exists: bool = True):
         '''
         Saves the frames to the data folder
         '''
+        frames_path = mg_dir_path(self.id) + 'frames/'
+
+        if skip_if_exists and os.path.exists(frames_path):
+            print('Frames already processed, Skipping')
+            return
+
         vid = self.get_video()
 
         print('Processing frames')
-
-        frames_path = mg_dir_path(self.id) + 'frames/'
 
         if not os.path.exists(frames_path):
             os.makedirs(frames_path)
