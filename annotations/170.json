@@ -1,1 +1,1 @@
-{"id": 170, "action_frames": [], "is_test": false}
+{"id": 170, "action_frames": [[50, "inspection"], [179, "not_moving"], [210, "moving"], [483, "not_moving"], [649, "inspection"], [814, "not_moving"], [858, "moving"], [1129, "not_moving"], [1785, "inspection"], [2012, "not_moving"], [2047, "moving"], [2282, "not_moving"], [2492, "inspection"], [2712, "not_moving"], [2746, "moving"], [3006, "not_moving"], [3219, "inspection"], [3425, "not_moving"], [3467, "moving"], [3752, "not_moving"]], "is_test": false}
