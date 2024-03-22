@@ -70,16 +70,6 @@ if __name__ == "__main__":
     parser.add_argument("--live", action="store_true")
     args = parser.parse_args()
 
-    # train_dataset = MGDataset(frames_per_item=2, split='train')
-    # val_dataset = MGDataset(frames_per_item=2, split='test')
-    pipeline = DataPipeline(frames_per_item=2)
-    train_dataset = pipeline.get_dataset('train')
-    val_dataset = pipeline.get_dataset('test')
-    print("train dataset length: ", len(train_dataset))
-    print("val dataset length: ", len(val_dataset))
-    train_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
-    val_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
-    viz_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=False)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = TurnClassifier(hidden_dim=1024, num_classes=2, enc_name="vit-base", num_frames=2)
@@ -87,6 +77,13 @@ if __name__ == "__main__":
     print(model)
 
     if args.train:
+        pipeline = DataPipeline(frames_per_item=2)
+        train_dataset = pipeline.get_dataset('train')
+        val_dataset = pipeline.get_dataset('test')
+        print("train dataset length: ", len(train_dataset))
+        print("val dataset length: ", len(val_dataset))
+        train_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
+        val_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
         train(model, args, train_loader, val_loader, device)
     elif args.live:
         model.eval()
@@ -105,6 +102,8 @@ if __name__ == "__main__":
                 output = model(images)
                 print("output: ", output)
     else:
+        pipeline = DataPipeline(frames_per_item=2)
+        viz_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=False)
         model.load_state_dict(torch.load(args.checkpoint))
         model.eval()
 
