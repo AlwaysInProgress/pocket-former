@@ -11,7 +11,6 @@ from pytube import YouTube
 from torch.utils.data import Dataset
 import torch
 import numpy as np
-import argparse
 from utils import *
 
 mg_path = 'data/mg/'
@@ -167,7 +166,7 @@ class MG:
 
         return num_frames
 
-    def get_frame_label(self, frame_num: int) -> Literal["moving", "not_moving", "inspection", "unlabeled"]:
+    def get_frame_label(self, frame_num: int) -> ALL_LABELS:
         if len(self.action_frames) == 0:
             return "unlabeled"
         prev_label = "unlabeled"
@@ -191,66 +190,6 @@ class MG:
         return img_tensor
 
 
-def download_one_by_id(id: int):
-    url = "https://reco.nz/solve/" + str(id)
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-
-    heading = soup.h1
-    if heading is None or "3x3" not in heading.text:
-        print("Not a 3x3 solve")
-        return
-
-    iframe = soup.iframe
-
-    if iframe is None:
-        print("No iframe found")
-        return
-
-    yt_url = iframe['src']
-
-    # Check if video is available
-
-    if type(yt_url) is not str:
-        print("Multiple iframes found")
-        return
-
-    # map to list of hrefs
-    urls: List[str] = list(map(lambda a: a.get("href"), soup.find_all('a')))
-    # filter out urls with cubedb
-    urls = list(filter(lambda u: "cubedb" in u, urls))
-
-    # Maps to url object and get the alg url query
-    algs = list(map(lambda u: parse_qs(urlparse(u).query).get("alg"), urls))
-
-    if len(algs) == 0:
-        print("No algs found")
-        return
-
-    val = algs[0]
-
-    if val is None:
-        print("No alg found 2")
-        return
-
-    moveGroups = val[0].split("\n")
-
-    moves = []
-    for grp in moveGroups:
-        candidates = grp.split(" ")
-
-        # remove all candidates after "//"
-        commentStart = candidates.index("//")
-
-        goodCandidates = candidates[:commentStart]
-        moves += goodCandidates
-
-    # Remove parenthesis
-    moves = list(map(lambda m: m.replace("(", "").replace(")", ""), moves))
-
-    solve = MG(id=id, web_id=id, url=yt_url, moves=moves)
-
-    return solve
 
 
 @dataclass
@@ -316,11 +255,10 @@ class MGDataset(Dataset):
     def get_data_point(self, idx: int):
         return self.dps[idx]
 
-
     def download_all(self, amount: int = 100):
         solves = []
         for i in range(1, amount + 1):
-            solve = download_one_by_id(i)
+            solve = self.download_by_web_id(i)
             if solve is not None:
                 print('Adding solve' + str(i))
                 solves.append(solve)
@@ -411,6 +349,67 @@ class MGDataset(Dataset):
 
         mg = mgs[idx]
         return mg
+
+    def download_by_web_id(self, id: int):
+        url = "https://reco.nz/solve/" + str(id)
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        heading = soup.h1
+        if heading is None or "3x3" not in heading.text:
+            print("Not a 3x3 solve")
+            return
+
+        iframe = soup.iframe
+
+        if iframe is None:
+            print("No iframe found")
+            return
+
+        yt_url = iframe['src']
+
+        # Check if video is available
+
+        if type(yt_url) is not str:
+            print("Multiple iframes found")
+            return
+
+        # map to list of hrefs
+        urls: List[str] = list(map(lambda a: a.get("href"), soup.find_all('a')))
+        # filter out urls with cubedb
+        urls = list(filter(lambda u: "cubedb" in u, urls))
+
+        # Maps to url object and get the alg url query
+        algs = list(map(lambda u: parse_qs(urlparse(u).query).get("alg"), urls))
+
+        if len(algs) == 0:
+            print("No algs found")
+            return
+
+        val = algs[0]
+
+        if val is None:
+            print("No alg found 2")
+            return
+
+        moveGroups = val[0].split("\n")
+
+        moves = []
+        for grp in moveGroups:
+            candidates = grp.split(" ")
+
+            # remove all candidates after "//"
+            commentStart = candidates.index("//")
+
+            goodCandidates = candidates[:commentStart]
+            moves += goodCandidates
+
+        # Remove parenthesis
+        moves = list(map(lambda m: m.replace("(", "").replace(")", ""), moves))
+
+        solve = MG(id=id, web_id=id, url=yt_url, moves=moves)
+
+        return solve
 
 
 
