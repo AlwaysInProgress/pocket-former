@@ -196,9 +196,18 @@ class MG:
         for frame_num in range(self.get_frame_count() - frames_per_datapoint):
             label = self.get_frame_label(frame_num)
             frame_paths = []
+            differnt_label = False
             for i in range(frames_per_datapoint):
+                end_frame = frame_num + i
+                end_frame_label = self.get_frame_label(end_frame)
+                if end_frame_label != label:
+                    differnt_label = True
                 path = mg_dir_path(self.id) + 'frames/' + str(frame_num + i) + '.jpg'
                 frame_paths.append(path)
+
+            if differnt_label:
+                print(f"Skipping datapoint with multiple labels")
+                continue
 
             if label in ['unlabeled', 'inspection', 'scramble']:
                 print(f"Skipping frame with label {label}")
