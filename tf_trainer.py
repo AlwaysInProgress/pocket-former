@@ -39,17 +39,18 @@ def train_epoch(model: Transformer, optimizer: torch.optim.Optimizer, args: Args
     loss_sum = 0
 
     for batch, labels in tqdm(train_loader):
+        batch = batch.to(device)
         if args.use_warmup_cos_decay:
-            # lr = get_lin_warmup_cos_decay_lr(it=global_iter, warmup_iters=2000, lr_decay_iters=600000, min_lr=6e-5, max_lr=6e-4)
             lr = get_lin_warmup_cos_decay_lr(it=global_iter, warmup_iters=2000, lr_decay_iters=args.num_epochs*args.epoch_len, min_lr=6e-5, max_lr=6e-4)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
-        batch = batch.to(device)
-        labels = labels.view(-1).to(device)
+        labels = labels.flatten().to(device)
         optimizer.zero_grad()
-        output = model(batch).view((-1, model.vocab_size))
+        output = model(batch)
+        output = output.view((-1, model.vocab_size))
         probs = torch.softmax(output, dim=-1)
         loss = nn.functional.cross_entropy(output, labels)
+        
         if torch.isfinite(loss):
             loss.backward()
             if args.clip_grad > 0:
@@ -84,8 +85,10 @@ def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray, epoch_l
     with torch.no_grad():
         for batch, labels in tqdm(val_loader):
             batch = batch.to(device)
-            labels = labels.view(-1).to(device)
-            output = model(batch).view((-1, model.vocab_size))
+            labels = labels.flatten().to(device)
+            output = model(batch)
+            output = output.view((-1, model.vocab_size))
+            probs = torch.softmax(output, dim=-1)
             loss = nn.functional.cross_entropy(output, labels)
             loss_sum += loss.item()
 
@@ -210,7 +213,6 @@ if __name__ == "__main__":
         num_heads=args.num_heads,
         dropout=0.0,
         num_blocks=args.num_blocks,
-        train=False
     )
     t.to(device)
     print(t)

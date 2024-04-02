@@ -24,19 +24,16 @@ class AttentionHead(nn.Module):
 
         attn_map = q @ kT / self.qkv_dim ** 0.5
 
-        # attn_mask = torch.tril(torch.ones_like(attn_map))
-        # attn_map_masked = torch.where(attn_mask == 0, -1e9, attn_map)
-        # subtracting 1e9 instead
         attn_map_masked = attn_map - 1e9 * (1 - torch.tril(torch.ones_like(attn_map)))
-        attn_map = self.softmax(attn_map_masked)
-        attn_map = self.dropout(attn_map_masked)
+        attn_map_masked = self.softmax(attn_map_masked)
+        attn_map_masked = self.dropout(attn_map_masked)
 
         res = attn_map_masked @ v
 
         return res
 
 class Transformer(nn.Module):
-    def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0.1, num_blocks=6, train=False, vocab_size=50257):
+    def __init__(self, hidden_dim, seq_len, num_heads=1, dropout=0.1, num_blocks=6, vocab_size=50257):
         super(Transformer, self).__init__()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.hidden_dim = hidden_dim

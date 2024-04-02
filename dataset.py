@@ -86,6 +86,7 @@ def get_batch(
     idx = np.random.randint(0, n - seq_len, batch_size)
     res = [dataset[i:i+seq_len] for i in idx]
     return torch.tensor(res, dtype=torch.int64)
+    # TODO: make this faster
 
 def get_epoch(
     seq_len: int, 
@@ -95,10 +96,10 @@ def get_epoch(
 ):
     batches = []
     for _ in range(epoch_len):
-        batch = get_batch(seq_len, batch_size, dataset)
+        batch = get_batch(seq_len + 1, batch_size, dataset)
         batches.append((
-            torch.tensor(batch[:-1], dtype=torch.int64), # input
-            torch.tensor(batch[1:], dtype=torch.int64), # output
+            batch[:, :-1], # input
+            batch[:, 1:], # output
         ))
     return batches
 
