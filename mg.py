@@ -33,7 +33,7 @@ def mg_annotations_path(web_id: int):
     path = os.path.join(os.path.dirname(__file__), path)
     return path
 
-ALL_LABELS = Literal['moving', 'not_moving', 'inspection', 'scramble', 'unlabeled']
+ALL_LABELS = Literal['not_moving', 'moving', 'inspection', 'scramble', 'unlabeled']
 
 @dataclass
 class MG:
