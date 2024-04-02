@@ -1,30 +1,5 @@
-from typing import Optional
 import torch
-from torch._prims_common import check
 import torch.nn as nn
-import argparse
-from tqdm import tqdm
-from dataset import *
-import datetime
-from dataclasses import dataclass
-import math
-from torch import Tensor
-import torch.nn.functional as F
-
-@dataclass
-class Args:
-    bs: int
-    seq_len: int
-    hidden_dim: int
-    num_heads: int
-    num_epochs: int
-    prompt: Optional[str]
-    train: bool
-    checkpoint: Optional[str]
-    num_blocks: int
-    epoch_len: int
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class AttentionHead(nn.Module):
     def __init__(self, hidden_dim, qkv_dim, dropout=0.1):
@@ -37,7 +12,7 @@ class AttentionHead(nn.Module):
 
         self.layer_norm = nn.LayerNorm(self.qkv_dim)
         self.dropout = nn.Dropout(p=dropout)
-        self.softmax = nn.Softmax2d()
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x: torch.Tensor):
         # x is shape (batch_size, seq_len, hidden_dim)
@@ -47,11 +22,14 @@ class AttentionHead(nn.Module):
 
         kT = k.reshape(k.shape[0], k.shape[2], k.shape[1])
 
-        attn_map = self.softmax(q @ kT / self.qkv_dim ** 0.5)
-        attn_map = self.dropout(attn_map)
-        attn_mask = torch.tril(torch.ones_like(attn_map))
-        attn_map_masked = attn_map * attn_mask
-        attn_map_masked[attn_mask == 0] = 1e-9
+        attn_map = q @ kT / self.qkv_dim ** 0.5
+
+        # attn_mask = torch.tril(torch.ones_like(attn_map))
+        # attn_map_masked = torch.where(attn_mask == 0, -1e9, attn_map)
+        # subtracting 1e9 instead
+        attn_map_masked = attn_map - 1e9 * (1 - torch.tril(torch.ones_like(attn_map)))
+        attn_map = self.softmax(attn_map_masked)
+        attn_map = self.dropout(attn_map_masked)
 
         res = attn_map_masked @ v
 
@@ -72,7 +50,7 @@ class Transformer(nn.Module):
         self.embedding = nn.Embedding(self.vocab_size, self.hidden_dim).to(device)
         self.positional_encoding = nn.Parameter(torch.randn((self.seq_len, self.hidden_dim))).to(device) 
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
-        self.softmax = nn.Softmax2d()
+        self.softmax = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(p=dropout)
         self.mha_proj = nn.Linear(hidden_dim, hidden_dim)
         self.lm_head = nn.Linear(self.hidden_dim, self.vocab_size)
@@ -97,9 +75,9 @@ class Transformer(nn.Module):
         num_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of parameters: {num_params}")
 
-    def mha(self, x):
-        # projections have shape (batch_size, num_heads, seq_len, hidden_dim)
-        return self.mha_proj(torch.concatenate([head(x) for head in self.attention_heads], dim=-1))
+    # def mha(self, x):
+    #     # projections have shape (batch_size, num_heads, seq_len, hidden_dim)
+    #     return self.mha_proj(torch.concatenate([head(x) for head in self.attention_heads], dim=-1))
 
     def forward(self, x):
         x = self.embedding(x)
@@ -107,221 +85,8 @@ class Transformer(nn.Module):
         for block in self.blocks:
             attn = torch.cat([head(x) for head in block[0]], dim=-1) # mha
             attn = block[1](attn) # mha_proj
-            attn = self.dropout(x + self.layer_norm(attn)) # add and norm
-            res = block[2](attn) + self.layer_norm(attn) # mlp
+            attn = self.dropout(x + self.layer_norm(attn)) # norm and add
+            res = attn + self.layer_norm(block[2](attn)) # mlp
             x = res
         res = self.layer_norm(x)
         return self.lm_head(res)
-
-def train_epoch(model: Transformer, optimizer: torch.optim.Optimizer, args: Args, test_dataset: np.ndarray, epoch_len: int = 10000) -> float:
-    train_loader = get_epoch(
-        args.seq_len, 
-        args.bs, 
-        epoch_len=epoch_len, 
-        dataset=train_dataset
-    )
-    model.train()
-    loss_sum = 0
-
-    for batch, labels in tqdm(train_loader):
-        optimizer.zero_grad()
-        batch = batch.to(device)
-        labels = labels.view(-1).to(device)
-        output = model(batch).view((-1, model.vocab_size))
-        probs = torch.softmax(output, dim=-1)
-        loss = nn.functional.cross_entropy(output, labels)
-        if torch.isfinite(loss):
-            loss.backward()
-            optimizer.step()
-        loss_sum += loss.item()
-
-    loss_avg = loss_sum / len(train_loader)
-
-    return loss_avg
-
-def eval_epoch(model: Transformer, args: Args, test_dataset: np.ndarray, epoch_len: int = 100) -> float:
-    val_loader = get_epoch(
-        args.seq_len, 
-        args.bs, 
-        epoch_len=epoch_len, 
-        dataset=test_dataset
-    )
-    model.train()
-    loss_sum = 0
-
-    with torch.no_grad():
-        for batch, labels in tqdm(val_loader):
-            batch = batch.to(device)
-            labels = labels.view(-1).to(device)
-            output = model(batch).view((-1, model.vocab_size))
-            loss = nn.functional.cross_entropy(output, labels)
-            loss_sum += loss.item()
-
-    loss_avg = loss_sum / len(val_loader)
-
-    return loss_avg    
-
-
-def train(model: Transformer, args: Args, train_dataset: np.ndarray, test_dataset: np.ndarray, epoch_len: int = 1000):
-    optimizer = torch.optim.AdamW(t.parameters(), lr=2.5e-4, weight_decay=1e-2)
-    # optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    t.train()
-    for epoch in range(args.num_epochs):
-        print(f"Training Epoch {epoch + 1}...")
-        train_loss = train_epoch(model, optimizer, args, train_dataset, epoch_len=epoch_len)
-        print(f"Evaluating Epoch {epoch + 1}...")
-        val_loss = eval_epoch(t, args, test_dataset, epoch_len=100)
-        tokens_seen = (epoch + 1) * args.bs * args.seq_len * epoch_len
-        print(f'train loss for epoch {epoch + 1}: {train_loss}')
-        print(f'train perplexity: {math.exp(train_loss)}')
-        print(f'val loss for epoch {epoch + 1}: {val_loss}')
-        print(f'val perplexity: {math.exp(val_loss)}')
-        print(f'total tokens seen: {tokens_seen}')
-        save_model(model, "checkpoints", f"epoch_{epoch + 1}_{tokens_seen}_tokens_ppl_{round(math.exp(val_loss), 2)}_")
-
-def save_model(model, path, name=""):
-    if not os.path.exists(path):
-        os.makedirs(path)
-    
-    datetime_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    name = name + datetime_str + '.pt'
-    print(f"Saving model to {os.path.join(path, name)}")
-    torch.save(model.state_dict(), os.path.join(path, name) + datetime_str + '.pt')
-
-def pad_sequence(seq: torch.Tensor, seq_len: int, device: torch.device, pad_index: int = 0) -> torch.Tensor:
-    # seq has shape (bs, seq_len)
-    if seq.shape[1] < seq_len:
-        return torch.cat([seq, torch.ones((seq.shape[0], seq_len - seq.shape[1])).to(device) * pad_index], dim=1)
-    else:
-        return seq
-
-def prompt(t: Transformer, args: Args, checkpoint: str = None, dataset: np.ndarray = None):
-    t.eval()
-    if args.checkpoint is not None:
-        t.load_state_dict(torch.load(args.checkpoint))
-
-    enc = tiktoken.get_encoding("gpt2")
-    encoded_p = get_batch(seq_len=args.seq_len, batch_size=1, dataset=dataset)
-    # encoded_p = torch.tensor(enc.encode(args.prompt)).unsqueeze(0)
-    print("Prompt: ", enc.decode(encoded_p.squeeze().tolist()))
-    # print("Prompt: ", enc.decode(encoded_p))
-    
-    if args.prompt is None:
-        print("Prompt is None")
-        return "Error: prompt is None"
-
-    # eos = torch.zeros((seq_len)) # eos token
-    x = torch.tensor(encoded_p).to(device)
-    max_gen_tokens = 5
-    
-    with torch.no_grad():
-        for token in range(max_gen_tokens):
-            padded_x = pad_sequence(x, args.seq_len, device).long()
-            logits = t(padded_x).transpose(0, 1)[-1]
-            logits = top_k_top_p_filtering(logits, top_k=40)
-            probs = torch.softmax(logits, dim=-1)
-            # next_token = torch.argmax(probs, dim=-1)
-            # sample from the distribution
-            next_token = torch.multinomial(probs, 1)[0]
-            # next_token = nucleus_sampling(probs, p=0.9)
-            if next_token == 50256:
-                break
-
-            if x.shape[1] == args.seq_len:
-                x = x[:, 1:]
-
-            x = torch.concatenate([x, next_token.unsqueeze(0)], dim=1)
-            print(enc.decode(x.squeeze().tolist()))
-
-    return enc.decode(x.squeeze().tolist())
-
-def top_k_top_p_filtering(
-    logits: Tensor,
-    top_k: int = 0,
-    top_p: float = 1.0,
-    filter_value: float = -float("Inf"),
-    min_tokens_to_keep: int = 1,
-) -> Tensor:
-    """Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
-    Args:
-        logits: logits distribution shape (batch size, vocabulary size)
-        if top_k > 0: keep only top k tokens with highest probability (top-k filtering).
-        if top_p < 1.0: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
-            Nucleus filtering is described in Holtzman et al. (http://arxiv.org/abs/1904.09751)
-        Make sure we keep at least min_tokens_to_keep per batch example in the output
-    From: https://gist.github.com/thomwolf/1a5a29f6962089e871b94cbd09daf317
-    """
-    if top_k > 0:
-        top_k = min(max(top_k, min_tokens_to_keep), logits.size(-1))  # Safety check
-        # Remove all tokens with a probability less than the last token of the top-k
-        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-        logits[indices_to_remove] = filter_value
-
-    if top_p < 1.0:
-        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
-        # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
-        sorted_indices_to_remove = cumulative_probs > top_p
-        if min_tokens_to_keep > 1:
-            # Keep at least min_tokens_to_keep (set to min_tokens_to_keep-1 because we add the first one below)
-            sorted_indices_to_remove[..., :min_tokens_to_keep] = 0
-        # Shift the indices to the right to keep also the first token above the threshold
-        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-        sorted_indices_to_remove[..., 0] = 0
-
-        # scatter sorted tensors to original indexing
-        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-        logits[indices_to_remove] = filter_value
-    return logits
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--train", action="store_true")
-    parser.add_argument("--bs", type=int, default=16)
-    parser.add_argument("--seq_len", type=int, default=16)    
-    parser.add_argument("--hidden_dim", type=int, default=128)    
-    parser.add_argument("--num_heads", type=int, default=2)    
-    parser.add_argument("--num_epochs", type=int, default=10)
-    parser.add_argument("--prompt", type=str)
-    parser.add_argument("--checkpoint", type=str)
-    parser.add_argument("--num_blocks", type=int, default=6)
-    parser.add_argument("--epoch_len", type=int, default=1000)
-    args = parser.parse_args()
-
-
-    # Casts args to dataclass
-    args = Args(
-        bs=args.bs,
-        seq_len=args.seq_len,
-        hidden_dim=args.hidden_dim,
-        num_heads=args.num_heads,
-        num_epochs=args.num_epochs,
-        train=args.train,
-        prompt=args.prompt,
-        checkpoint=args.checkpoint,
-        num_blocks=args.num_blocks,
-        epoch_len=args.epoch_len
-    )
-
-    t = Transformer(
-        hidden_dim=args.hidden_dim, 
-        seq_len=args.seq_len, 
-        num_heads=args.num_heads,
-        dropout=0.1,
-        num_blocks=args.num_blocks,
-        train=False
-    )
-    t.to(device)
-
-    train_dataset = get_data('train')
-    test_dataset = get_data('test')
-
-    if args.train:
-        train(t, args, train_dataset, test_dataset, epoch_len=args.epoch_len)
-    elif args.prompt is not None:
-        res = prompt(t=t, args=args, dataset=test_dataset)
-        print("Response:", res)
-        exit()
-    else:
-        parser.print_help()
