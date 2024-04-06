@@ -7,10 +7,15 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-small_wikipedia_link = "https://raw.githubusercontent.com/arpytanshu/latent-semantic-indexing/master/wikipedia_utf8_filtered_20pageviews-1K.tsv"
-input_file_path = os.path.join(os.path.dirname(__file__), 'data/wiki-data.txt')
-train_file_path = os.path.join(os.path.dirname(__file__), 'data/train.bin')
-test_file_path = os.path.join(os.path.dirname(__file__), 'data/test.bin')
+# small_wikipedia_link = "https://raw.githubusercontent.com/arpytanshu/latent-semantic-indexing/master/wikipedia_utf8_filtered_20pageviews-1K.tsv"
+# input_file_path = os.path.join(os.path.dirname(__file__), 'data/wiki-data.txt')
+# train_file_path = os.path.join(os.path.dirname(__file__), 'data/train.bin')
+# test_file_path = os.path.join(os.path.dirname(__file__), 'data/test.bin')
+
+input_file_path = os.path.join(os.path.dirname(__file__), 'data/tiny-shakespeare.txt')
+train_file_path = os.path.join(os.path.dirname(__file__), 'data/tiny-shakespeare-train.bin')
+test_file_path = os.path.join(os.path.dirname(__file__), 'data/tiny-shakespeare-test.bin')
+
 os.makedirs(os.path.dirname("./data/"), exist_ok=True)
 
 enc = tiktoken.get_encoding("gpt2")
@@ -73,8 +78,8 @@ def download_data():
         with open(input_file_path, 'w') as f:
             f.write(data)
 
-def get_data(split: Literal['train', 'test']):
-    file_path = train_file_path if split == 'train' else test_file_path
+def get_data(file_path):
+    # file_path = train_file_path if split == 'train' else test_file_path
     return np.fromfile(file_path, dtype=np.uint16)
 
 def get_batch(

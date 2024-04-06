@@ -22,11 +22,14 @@ class AttentionHead(nn.Module):
 
         kT = k.reshape(k.shape[0], k.shape[2], k.shape[1])
 
-        attn_map = q @ kT / self.qkv_dim ** 0.5
+        attn_map = q @ kT / (self.qkv_dim ** 0.5)
 
         attn_map_masked = attn_map - 1e9 * (1 - torch.tril(torch.ones_like(attn_map)))
         attn_map_masked = self.softmax(attn_map_masked)
         attn_map_masked = self.dropout(attn_map_masked)
+
+        # torch.set_printoptions(profile="full")
+        # print("attn_map_masked", attn_map_masked)
 
         res = attn_map_masked @ v
 

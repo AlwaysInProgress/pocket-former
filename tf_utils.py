@@ -12,7 +12,7 @@ def save_model(checkpoint, path, name=""):
     datetime_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     name = name + datetime_str + '.pt'
     print(f"Saving model to {os.path.join(path, name)}")
-    torch.save(checkpoint, os.path.join(path, name) + datetime_str + '.pt')
+    torch.save(checkpoint, os.path.join(path, name))
 
 def pad_sequence(seq: torch.Tensor, seq_len: int, device: torch.device, pad_index: int = 0) -> torch.Tensor:
     # seq has shape (bs, seq_len)
